@@ -1,0 +1,4 @@
+explicitly compile:
+go build main.go
+
+./main
