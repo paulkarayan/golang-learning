@@ -2,12 +2,20 @@ package main
 
 import (
 	"fmt"
-	"os"
 )
 
 func main() {
-	if len(os.Args) != 2 {
-		os.Exit(1)
-	}
-	fmt.Println("It's over", os.Args[1])
+	goku := &Saiyan{"Goku", 1000}
+	Super(goku)
+	fmt.Println(goku.Power)
+
+}
+
+type Saiyan struct {
+	Name  string
+	Power int
+}
+
+func Super(s *Saiyan) {
+	s.Power += 10000
 }

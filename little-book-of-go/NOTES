@@ -2,3 +2,8 @@ explicitly compile:
 go build main.go
 
 ./main
+
+--
+
+Why do we want a pointer to the value, rather than the actual value? It comes down to the way Go passes arguments
+to a function: as copies
