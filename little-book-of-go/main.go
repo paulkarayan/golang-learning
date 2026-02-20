@@ -1,28 +1,15 @@
 package main
 
-import (
-	"fmt"
-)
+import "fmt"
 
 func main() {
-	goku := &Saiyan{"Goku", 1000}
-	goku.Super()
-	fmt.Println(goku.Power)
-
+	scores := []int{1, 2, 3, 4, 5}
+	scores = removeAtIndex(scores, 2)
+	fmt.Println(scores)
 }
 
-type Saiyan struct {
-	Name  string
-	Power int
-}
-
-func (s *Saiyan) Super() {
-	s.Power += 10000
-}
-
-func NewSaiyan(name string, power int) *Saiyan {
-	return &Saiyan{
-		Name:  name,
-		Power: power,
-	}
+func removeAtIndex(source []int, index int) []int {
+	lastIndex := len(source) - 1
+	source[index], source[lastIndex] = source[lastIndex], source[index]
+	return source[:lastIndex]
 }

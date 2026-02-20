@@ -12,3 +12,9 @@ to a function: as copies
 
 Structures don’t have constructors. Instead, you create a function that returns an instance of the desired type (like a
 factory)
+
+---
+Go doesn’t support negative values. If we want all of the values of a slice
+except the last, we do:
+scores := []int{1, 2, 3, 4, 5}
+scores = scores[:len(scores)-­1]
