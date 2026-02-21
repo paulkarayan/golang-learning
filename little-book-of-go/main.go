@@ -2,25 +2,29 @@ package main
 
 import (
 	"fmt"
-	"sync"
+	"math/rand"
 	"time"
 )
 
-var (
-	counter = 0
-	lock    sync.Mutex
-)
-
-func main() {
-	for i := 0; i < 20; i++ {
-		go incr()
-	}
-	time.Sleep(time.Millisecond * 10)
+type Worker struct {
+	id int
 }
 
-func incr() {
-	lock.Lock()
-	defer lock.Unlock()
-	counter++
-	fmt.Println(counter)
+func main() {
+	c := make(chan int)
+	for i := 0; i < 5; i++ {
+		worker := &Worker{id: i}
+		go worker.process(c)
+	}
+	for {
+		c <- rand.Int()
+		time.Sleep(time.Millisecond * 10)
+	}
+}
+
+func (w *Worker) process(c chan int) {
+	for {
+		data := <-c
+		fmt.Printf("worker %d got %d", w.id, data)
+	}
 }
