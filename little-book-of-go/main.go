@@ -1,11 +1,24 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"math/rand"
+	"sort"
+)
 
 func main() {
-	scores := []int{1, 2, 3, 4, 5}
-	scores = removeAtIndex(scores, 2)
-	fmt.Println(scores)
+	scores := make([]int, 100)
+	for i := 0; i < 100; i++ {
+		scores[i] = int(rand.Intn(1000))
+	}
+	sort.Ints(scores)
+
+	worst := make([]int, 5)
+	// copy(worst, scores[:5])
+	copy(worst, scores[:7])
+
+	fmt.Println(worst)
+
 }
 
 func removeAtIndex(source []int, index int) []int {
