@@ -58,3 +58,14 @@ go run ./cmd/cli/
 
 # bad subcommand (error)
 go run ./cmd/cli/ blah
+
+
+
+# testing
+
+- args []string — instead of reading os.Args, the caller passes args in. In tests you pass []string{"view",
+"--id", "3"}. In real usage, main() passes os.Args[1:].
+- stdout io.Writer — instead of fmt.Println, you use fmt.Fprintln(stdout, ...). In tests you pass a bytes.Buffer
+and check its contents. In real usage, main() passes os.Stdout.
+- returns int — instead of os.Exit(1), you return 1. In tests you check the return value. In real usage, main()
+calls os.Exit(run(...)).
