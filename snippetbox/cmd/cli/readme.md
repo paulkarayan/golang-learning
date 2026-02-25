@@ -37,3 +37,24 @@ Usage would look like:
 
 https://gobyexample.com/command-line-subcommands
 https://gobyexample.com/command-line-flags
+
+
+# commands
+
+cd snippetbox
+
+# foo subcommand
+go run ./cmd/cli/ foo
+go run ./cmd/cli/ foo --enable --name "test"
+go run ./cmd/cli/ foo --name "hello"
+
+# bar subcommand
+go run ./cmd/cli/ bar
+go run ./cmd/cli/ bar --level 5
+go run ./cmd/cli/ bar --level 5 things
+
+# no args (error)
+go run ./cmd/cli/
+
+# bad subcommand (error)
+go run ./cmd/cli/ blah
