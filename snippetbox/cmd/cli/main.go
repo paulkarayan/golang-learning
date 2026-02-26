@@ -1,12 +1,13 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
-	"strings"
 )
 
 // i have to change to this becuase otherwise args is global, os.Exit kills the process, and we dont capture stdout
@@ -112,9 +113,18 @@ func run(args []string, stdout io.Writer) int {
 
 		createCmd.Parse(args[1:])
 
-		payload := fmt.Sprintf(`{"title":%q,"content":%q,"expires":%d}`, *title, *content, *expires)
-		resp, err := http.Post(*host+"/snippet/create", "application/json", strings.NewReader(payload))
+		data := struct {
+			Title   string `json:"title"`
+			Content string `json:"content"`
+			Expires int    `json:"expires"`
+		}{*title, *content, *expires}
 
+		payload, err := json.Marshal(data)
+		if err != nil {
+			fmt.Fprintln(stdout, "error:", err)
+			return 1
+		}
+		resp, err := http.Post(*host+"/snippet/create", "application/json", bytes.NewReader(payload))
 		if err != nil {
 			fmt.Fprintln(stdout, "error", err)
 			return 1
