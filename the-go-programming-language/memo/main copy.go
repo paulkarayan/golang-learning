@@ -1,5 +1,4 @@
-// use monitor goroutines
-package main
+package oldmain
 
 import (
 	"fmt"
@@ -23,53 +22,35 @@ type entry struct {
 	ready chan struct{} // closed when res is ready
 }
 
-// client must call Close
 func New(f Func) *Memo {
-	memo := &Memo{requests: make(chan request)}
-	go memo.server(f)
-	return memo
+	return &Memo{f: f, cache: make(map[string]*entry)}
 }
 
 type Memo struct {
-	requests chan request
-}
-
-// request is a message asking Func be applied to a key
-type request struct {
-	key      string
-	response chan<- result // 1 result for client
+	f     Func
+	mu    sync.Mutex //cache guard
+	cache map[string]*entry
 }
 
 func (memo *Memo) Get(key string) (value interface{}, err error) {
-	response := make(chan result)           // single use channel to get back answer
-	memo.requests <- request{key, response} // send it to monitor goroutine
-	res := <-response                       // block until monitor sends results
-	return res.value, res.err
-}
-
-func (memo *Memo) Close() { close(memo.requests) }
-
-func (memo *Memo) server(f Func) {
-	cache := make(map[string]*entry)
-	for req := range memo.requests {
-		e := cache[req.key]
-		if e == nil {
-			e = &entry{ready: make(chan struct{})}
-			cache[req.key] = e
-			go e.call(f, req.key)
-		}
-		go e.deliver(req.response)
+	memo.mu.Lock()
+	e := memo.cache[key]
+	if e == nil {
+		// if first request for this key, this here go routine is responsible for computing the value and boradcasting ready condition
+		e = &entry{ready: make(chan struct{})}
+		memo.cache[key] = e
+		memo.mu.Unlock()
+		// the actual expensive lookup to populate cache
+		e.res.value, e.res.err = memo.f(key)
+		// broadcast that we are ready
+		close(e.ready)
+	} else {
+		// subsequent requests for key
+		memo.mu.Unlock()
+		// blocks until someone closes the channel. sorta like sync.WaitGroup
+		<-e.ready
 	}
-}
-
-func (e *entry) call(f Func, key string) {
-	e.res.value, e.res.err = f(key)
-	close(e.ready)
-}
-
-func (e *entry) deliver(response chan<- result) {
-	<-e.ready
-	response <- e.res
+	return e.res.value, e.res.err
 }
 
 func httpGetBody(url string) (interface{}, error) {
