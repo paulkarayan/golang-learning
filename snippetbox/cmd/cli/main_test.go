@@ -105,6 +105,20 @@ func TestCreateSnippet(t *testing.T) {
 	}
 }
 
+// this should fail for this commit until i fix other stuff...
+func TestViewTLS(t *testing.T) {
+	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok from " + r.URL.Path))
+	}))
+	defer ts.Close()
+
+	var buf bytes.Buffer
+	code := run([]string{"view", "--host", ts.URL, "--id", "1"}, &buf)
+	if code != 0 {
+		t.Fatalf("expected exit 0, got %d; output: %s", code, buf.String())
+	}
+}
+
 func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m)
 }

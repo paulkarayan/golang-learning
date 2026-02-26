@@ -48,7 +48,7 @@ func run(args []string, stdout io.Writer) int {
 	//  sbox home -v
 	case "home":
 		homeCmd := flag.NewFlagSet("home", flag.ExitOnError)
-		host := homeCmd.String("host", "http://localhost:4000", "server host")
+		host := homeCmd.String("host", "https://localhost:4000", "server host")
 		verbose := homeCmd.Bool("v", false, "verbose output")
 		homeCmd.Parse(args[1:])
 
@@ -71,7 +71,7 @@ func run(args []string, stdout io.Writer) int {
 	//  sbox view --id 1
 	case "view":
 		viewCmd := flag.NewFlagSet("view", flag.ExitOnError)
-		host := viewCmd.String("host", "http://localhost:4000", "server host")
+		host := viewCmd.String("host", "https://localhost:4000", "server host")
 		id := viewCmd.Int("id", 0, "snippet id")
 		verbose := viewCmd.Bool("v", false, "verbose output")
 
@@ -105,7 +105,7 @@ func run(args []string, stdout io.Writer) int {
 
 	case "create":
 		createCmd := flag.NewFlagSet("create", flag.ExitOnError)
-		host := createCmd.String("host", "http://localhost:4000", "server host")
+		host := createCmd.String("host", "https://localhost:4000", "server host")
 		title := createCmd.String("title", "", "snippet title")
 		content := createCmd.String("content", "", "snippet content")
 		expires := createCmd.Int("expires", 7, "days until expiry")
