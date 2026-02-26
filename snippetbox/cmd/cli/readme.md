@@ -103,3 +103,7 @@ NOTE: for test certs, i'm fine not gitignoring them. but i would in production
 go test ./cmd/server/ -v
 
 gotta chmod? no its fine, i got the path wrong.
+
+
+why did the tests pass???
+httptest.NewTLSServer generates its own temporary certs, and ts.Client() trusts them automatically.
