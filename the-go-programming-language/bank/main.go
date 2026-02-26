@@ -54,4 +54,23 @@ func main() {
 	}()
 	wg.Wait()
 	fmt.Println("final:", Balance())
+
+}
+
+// Cake example - serially confining a var to protect it
+type Cake struct{ state string }
+
+func baker(cooked chan<- *Cake) {
+	for {
+		cake := new(Cake)
+		cake.state = "cooked"
+		cooked <- cake // cake is taken away from baker
+	}
+}
+
+func icer(iced chan<- *Cake, cooked <-chan *Cake) {
+	for cake := range cooked {
+		cake.state = "iced"
+		iced <- cake // cake is taken away from icer
+	}
 }
