@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 )
 
 // i have to change to this becuase otherwise args is global, os.Exit kills the process, and we dont capture stdout
@@ -44,7 +45,6 @@ func run(args []string, stdout io.Writer) int {
 		fmt.Fprintln(stdout, "  tail:", barCmd.Args())
 
 	//  sbox home -v
-	// returns something like
 	case "home":
 		homeCmd := flag.NewFlagSet("home", flag.ExitOnError)
 		host := homeCmd.String("host", "http://localhost:4000", "server host")
@@ -67,6 +67,7 @@ func run(args []string, stdout io.Writer) int {
 		}
 		fmt.Fprintln(stdout, string(body))
 
+	//  sbox view --id 1
 	case "view":
 		viewCmd := flag.NewFlagSet("view", flag.ExitOnError)
 		host := viewCmd.String("host", "http://localhost:4000", "server host")
@@ -91,6 +92,36 @@ func run(args []string, stdout io.Writer) int {
 		}
 
 		defer resp.Body.Close()
+		body, _ := io.ReadAll(resp.Body)
+		if *verbose {
+			fmt.Fprintln(stdout, "Status:", resp.Status)
+			for k, v := range resp.Header {
+				fmt.Fprintf(stdout, "%s: %s\n", k, v)
+			}
+			fmt.Fprintln(stdout, "---")
+		}
+		fmt.Fprintln(stdout, string(body))
+
+	case "create":
+		createCmd := flag.NewFlagSet("create", flag.ExitOnError)
+		host := createCmd.String("host", "http://localhost:4000", "server host")
+		title := createCmd.String("title", "", "snippet title")
+		content := createCmd.String("content", "", "snippet content")
+		expires := createCmd.Int("expires", 7, "days until expiry")
+		verbose := createCmd.Bool("v", false, "verbose output")
+
+		createCmd.Parse(args[1:])
+
+		payload := fmt.Sprintf(`{"title":%q,"content":%q,"expires":%d}`, *title, *content, *expires)
+		resp, err := http.Post(*host+"/snippet/create", "application/json", strings.NewReader(payload))
+
+		if err != nil {
+			fmt.Fprintln(stdout, "error", err)
+			return 1
+		}
+
+		defer resp.Body.Close()
+
 		body, _ := io.ReadAll(resp.Body)
 		if *verbose {
 			fmt.Fprintln(stdout, "Status:", resp.Status)
