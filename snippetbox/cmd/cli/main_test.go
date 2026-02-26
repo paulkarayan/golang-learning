@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -61,10 +60,10 @@ func TestViewWithID(t *testing.T) {
 	}))
 	// goleak catches if this is commented out!!
 	defer ts.Close()
-	fmt.Print(ts)
+	// fmt.Print(ts)
 	var buf bytes.Buffer
 	code := run([]string{"view", "--host", ts.URL, "--id", "1"}, &buf)
-	fmt.Print(code)
+	// fmt.Print(code)
 	if code != 0 {
 		t.Fatalf("expected exit 0, got %d", code)
 	}
