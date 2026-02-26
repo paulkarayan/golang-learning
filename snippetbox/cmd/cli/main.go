@@ -67,9 +67,43 @@ func run(args []string, stdout io.Writer) int {
 		}
 		fmt.Fprintln(stdout, string(body))
 
+	case "view":
+		viewCmd := flag.NewFlagSet("view", flag.ExitOnError)
+		host := viewCmd.String("host", "http://localhost:4000", "server host")
+		id := viewCmd.Int("id", 0, "snippet id")
+		verbose := viewCmd.Bool("v", false, "verbose output")
+
+		viewCmd.Parse(args[1:])
+
+		//The flag methods (String, Int, Bool) return pointers
+		//   because the values don't exist yet at declaration time —
+		//   they get filled in when Parse runs. The pointer gives
+		//  you a reference to where the value will be once parsing
+		//  happens.
+		//  That's why you dereference with *host, *id, etc. — to
+		//  get the actual value after parsing.
+
+		// remember id = 0 is default and will 404
+		resp, err := http.Get(fmt.Sprintf("%s/snippet/view/%d", *host, *id))
+		if err != nil {
+			fmt.Fprintln(stdout, "error", err)
+			return 1
+		}
+
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(resp.Body)
+		if *verbose {
+			fmt.Fprintln(stdout, "Status:", resp.Status)
+			for k, v := range resp.Header {
+				fmt.Fprintf(stdout, "%s: %s\n", k, v)
+			}
+			fmt.Fprintln(stdout, "---")
+		}
+		fmt.Fprintln(stdout, string(body))
+
 	// wrong args
 	default:
-		fmt.Fprintln(stdout, "expected 'foo' or 'bar' subcommands")
+		fmt.Fprintln(stdout, "expected 'foo' or 'bar' or 'home' or 'view' subcommands")
 		return 1
 	}
 	return 0

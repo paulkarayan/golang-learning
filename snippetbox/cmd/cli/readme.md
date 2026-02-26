@@ -71,6 +71,14 @@ calls os.Exit(run(...)).
 
 go test ./cmd/cli/ -v
 
+leaks!
+go get go.uber.org/goleak
+
+func TestMain(m *testing.M) {
+    goleak.VerifyTestMain(m)
+}
+
+
 
 # build
 

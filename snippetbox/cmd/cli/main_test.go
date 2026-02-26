@@ -2,7 +2,13 @@ package main
 
 import (
 	"bytes"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
+
+	"go.uber.org/goleak"
 )
 
 func TestNoArgs(t *testing.T) {
@@ -47,4 +53,26 @@ func TestHappyFooAndBar(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestViewWithID(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok from " + r.URL.Path))
+	}))
+	// goleak catches if this is commented out!!
+	defer ts.Close()
+	fmt.Print(ts)
+	var buf bytes.Buffer
+	code := run([]string{"view", "--host", ts.URL, "--id", "1"}, &buf)
+	fmt.Print(code)
+	if code != 0 {
+		t.Fatalf("expected exit 0, got %d", code)
+	}
+	if !strings.Contains(buf.String(), "snippet/view/1") {
+		t.Fatalf("unexpected body: %s", buf.String())
+	}
+}
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
 }
