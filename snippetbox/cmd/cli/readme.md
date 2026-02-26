@@ -83,3 +83,16 @@ func TestMain(m *testing.M) {
 # build
 
 go build -o sbox ./cmd/cli/
+
+
+--- TLS
+
+file:///Users/pk/Desktop/golang/lets-go-professional-package.html/09.03-generating-a-self-signed-tls-certificate.html
+
+for ease:
+brew install mkcert
+mkcert -install
+
+mkcert defaults to a reasonable key size (EC P-256)
+
+mkcert localhost
