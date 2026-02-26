@@ -69,3 +69,5 @@ go run ./cmd/cli/ blah
 and check its contents. In real usage, main() passes os.Stdout.
 - returns int — instead of os.Exit(1), you return 1. In tests you check the return value. In real usage, main()
 calls os.Exit(run(...)).
+
+go test ./cmd/cli/ -v
