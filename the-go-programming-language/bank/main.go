@@ -15,8 +15,23 @@ func Deposit(amount int) { deposits <- amount }
 // blocks until value recieved, then returns it
 func Balance() int { return <-balances }
 
-func printState() {
-	fmt.Println("balance:", Balance())
+// 9.1 exercise
+// can i withdraw or not due to sufficient funds?
+
+type withdrawal struct {
+	amount int
+	result chan bool
+}
+
+var withdrawals = make(chan withdrawal)
+
+// goroutines can't return values directly to each other, so you pass a channel as a callback mechanism.
+// that's return_ch
+// which i pass to the teller monitor, using the withdrawals channel
+func Withdraw(amount int) bool {
+	return_ch := make(chan bool)
+	withdrawals <- withdrawal{amount, return_ch}
+	return <-return_ch
 }
 
 func teller() {
@@ -25,6 +40,15 @@ func teller() {
 		select {
 		case amount := <-deposits:
 			balance += amount
+		// this is how we receive, check, and return info. wd is the withdrawal struct.
+		case wd := <-withdrawals:
+			if wd.amount <= balance {
+				balance -= wd.amount
+				wd.result <- true
+			} else {
+				wd.result <- false
+			}
+
 		case balances <- balance:
 		}
 	}
@@ -49,11 +73,22 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		go Deposit(100)
+		// i had an extra go routine
+		Deposit(100)
 
 	}()
 	wg.Wait()
 	fmt.Println("final:", Balance())
+
+	// test 9.1 exercise
+	Deposit(200)
+	fmt.Println("balance after deposit:", Balance())
+
+	ok := Withdraw(50)
+	fmt.Println("withdraw 50:", ok, "balance:", Balance())
+
+	ok = Withdraw(500)
+	fmt.Println("withdraw 500:", ok, "balance:", Balance())
 
 }
 
