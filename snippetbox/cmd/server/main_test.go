@@ -71,3 +71,24 @@ func TestSnippetCreatePost(t *testing.T) {
 		t.Fatalf("expected 201, got %d", rr.Code)
 	}
 }
+
+// actual mux routing + handlers over a real TLS connection. prior tests use http, they test the handler logic. thats fine.
+func TestServerTLS(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /{$}", home)
+	mux.HandleFunc("GET /snippet/view/{id}", snippetView)
+	mux.HandleFunc("POST /snippet/create", snippetCreatePost)
+
+	ts := httptest.NewTLSServer(mux)
+	defer ts.Close()
+
+	client := ts.Client()
+
+	resp, err := client.Get(ts.URL + "/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != 200 {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+}
