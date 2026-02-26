@@ -16,9 +16,11 @@ func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	mux := http.NewServeMux()
-	// TLS 1.2 vs. default of 1.0
+	// just make it TLS 1.3
 	tlsConfig := &tls.Config{
-		MinVersion: tls.VersionTLS12,
+		MinVersion: tls.VersionTLS13,
+		CurvePreferences: []tls.CurveID{tls.X25519,
+			tls.CurveP256},
 	}
 
 	srv := &http.Server{

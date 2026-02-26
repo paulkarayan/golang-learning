@@ -107,3 +107,20 @@ gotta chmod? no its fine, i got the path wrong.
 
 why did the tests pass???
 httptest.NewTLSServer generates its own temporary certs, and ts.Client() trusts them automatically.
+
+-- cipher suite
+
+using  mozilla modern options
+
+With TLS 1.3, Go uses all three and you can't change
+  them:
+
+  1. TLS_AES_128_GCM_SHA256
+  2. TLS_AES_256_GCM_SHA384
+  3. TLS_CHACHA20_POLY1305_SHA256
+
+  Go picks which one at runtime based on hardware support.
+   AES-GCM if the CPU has AES-NI (your Mac does), CHACHA20
+   otherwise.
+
+--- add Bearer auth
