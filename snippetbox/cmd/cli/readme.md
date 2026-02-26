@@ -25,8 +25,7 @@ Structure:
       main.go        // flag parsing, subcommand dispatch
       client.go      // shared HTTP client + helpers
 
-Approach: Use flag.NewFlagSet per subcommand — Go's flag package doesn't have built-in subcommand support, but
-  you create a FlagSet for each (home, view, create) and switch on os.Args[1] to pick which set to parse.
+Approach: Use flag.NewFlagSet per subcommand — Go's flag package doesn't have built-in subcommand support, but you create a FlagSet for each (home, view, create) and switch on os.Args[1] to pick which set to parse.
 
 Usage would look like:
   sbox view --id 3
@@ -71,3 +70,8 @@ and check its contents. In real usage, main() passes os.Stdout.
 calls os.Exit(run(...)).
 
 go test ./cmd/cli/ -v
+
+
+# build
+
+go build -o sbox ./cmd/cli/
