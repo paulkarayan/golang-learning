@@ -124,3 +124,6 @@ With TLS 1.3, Go uses all three and you can't change
    otherwise.
 
 --- add Bearer auth
+
+https://www.alexedwards.net/blog/basic-authentication-in-go
+^^ follow a pattern like this
