@@ -38,6 +38,9 @@ func snippetCreatePost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Bad request", http.StatusBadRequest)
 		return
 	}
-	fmt.Fprintf(w, "Title: %s\nContent: %s\nExpires: %d\n", input.Title, input.Content, input.Expires)
+	// note: i had a bug here - the first write implicity sent at 200 status. i caught in tests!
+	// fmt.Fprintf(w, ...) writes bytes to w, which is the http.ResponseWriter.   gdi
 	w.WriteHeader(http.StatusCreated)
+	fmt.Fprintf(w, "Title: %s\nContent: %s\nExpires: %d\n", input.Title, input.Content, input.Expires)
+	// w.WriteHeader(http.StatusCreated)
 }

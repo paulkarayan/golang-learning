@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -30,5 +31,43 @@ func TestHome(t *testing.T) {
 	// Server header should be "Go"
 	if rr.Header().Get("Server") != "Go" {
 		t.Fatalf("expected Server header 'Go', got %q", rr.Header().Get("Server"))
+	}
+}
+
+func TestSnippetView(t *testing.T) {
+	req := httptest.NewRequest("GET", "/snippet/view/1", nil)
+	req.SetPathValue("id", "1")
+	rr := httptest.NewRecorder()
+	snippetView(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "1") {
+		t.Fatalf("expected body to contain ID, got %q", rr.Body.String())
+	}
+}
+
+func TestSnippetCreateGet(t *testing.T) {
+	req := httptest.NewRequest("GET", "/snippet/create", nil)
+	rr := httptest.NewRecorder()
+	snippetCreate(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+}
+
+func TestSnippetCreatePost(t *testing.T) {
+	// backticks are raw string literals in Go otherwise id need to escpe them, no thanks!
+	body := `{"title": "Hello", "content": "fmt.Println()", "expires": 7}`
+	//  httptest.NewRequest expects an io.Reader for the body, not a string. so satisfy the interface by wrapping the string
+	req := httptest.NewRequest("POST", "/snippet/create", strings.NewReader(body))
+	rr := httptest.NewRecorder()
+	snippetCreatePost(rr, req)
+
+	// bc http.StatusCreated => 201
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d", rr.Code)
 	}
 }
