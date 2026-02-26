@@ -13,7 +13,7 @@ import (
 
 func TestNoArgs(t *testing.T) {
 	var buf bytes.Buffer
-	code := run([]string{}, &buf)
+	code := run([]string{}, &buf, nil)
 	if code != 1 {
 		t.Fatalf("expected exit 1, got %d", code)
 	}
@@ -21,7 +21,7 @@ func TestNoArgs(t *testing.T) {
 
 func TestWrongSubcommand(t *testing.T) {
 	var buf bytes.Buffer
-	code := run([]string{"wrong"}, &buf)
+	code := run([]string{"wrong"}, &buf, nil)
 	if code != 1 {
 		t.Fatalf("expected exit 1, got %d", code)
 	}
@@ -29,7 +29,7 @@ func TestWrongSubcommand(t *testing.T) {
 
 func TestHappyFoo(t *testing.T) {
 	var buf bytes.Buffer
-	code := run([]string{"foo", "--enable", "--name", "test"}, &buf) // "test" is passed
+	code := run([]string{"foo", "--enable", "--name", "test"}, &buf, nil) // "test" is passed
 	if code != 0 {
 		t.Fatalf("expected exit 0 so success, got %d", code)
 	}
@@ -37,6 +37,7 @@ func TestHappyFoo(t *testing.T) {
 
 // use the table-driven test
 func TestHappyFooAndBar(t *testing.T) {
+
 	tests := []struct {
 		name string
 		args []string
@@ -47,7 +48,8 @@ func TestHappyFooAndBar(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			code := run(tt.args, &buf)
+			// we dont make http calls so just doing nil to appease run()
+			code := run(tt.args, &buf, nil)
 			if code != 0 {
 				t.Fatalf("expected exit 0 so success, got %d", code)
 			}
@@ -56,14 +58,14 @@ func TestHappyFooAndBar(t *testing.T) {
 }
 
 func TestViewWithID(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok from " + r.URL.Path))
 	}))
 	// goleak catches if this is commented out!!
 	defer ts.Close()
 	// fmt.Print(ts)
 	var buf bytes.Buffer
-	code := run([]string{"view", "--host", ts.URL, "--id", "1"}, &buf)
+	code := run([]string{"view", "--host", ts.URL, "--id", "1"}, &buf, ts.Client())
 	// fmt.Print(code)
 	if code != 0 {
 		t.Fatalf("expected exit 0, got %d", code)
@@ -74,7 +76,7 @@ func TestViewWithID(t *testing.T) {
 }
 
 func TestCreateSnippet(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// verify it's a POST with JSON
 		if r.Method != "POST" {
 			t.Fatalf("expected POST, got %s", r.Method)
@@ -96,7 +98,8 @@ func TestCreateSnippet(t *testing.T) {
 	defer ts.Close()
 
 	var buf bytes.Buffer
-	code := run([]string{"create", "--host", ts.URL, "--title", "Wasabi", "--content", "w", "--expires", "7"}, &buf)
+	code := run([]string{"create", "--host", ts.URL, "--title", "Wasabi", "--content",
+		"w", "--expires", "7"}, &buf, ts.Client())
 	if code != 0 {
 		t.Fatalf("expected exit 0, got %d", code)
 	}
@@ -113,7 +116,7 @@ func TestViewTLS(t *testing.T) {
 	defer ts.Close()
 
 	var buf bytes.Buffer
-	code := run([]string{"view", "--host", ts.URL, "--id", "1"}, &buf)
+	code := run([]string{"view", "--host", ts.URL, "--id", "1"}, &buf, ts.Client())
 	if code != 0 {
 		t.Fatalf("expected exit 0, got %d; output: %s", code, buf.String())
 	}

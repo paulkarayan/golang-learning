@@ -12,10 +12,10 @@ import (
 
 // i have to change to this becuase otherwise args is global, os.Exit kills the process, and we dont capture stdout
 func main() {
-	os.Exit(run(os.Args[1:], os.Stdout))
+	os.Exit(run(os.Args[1:], os.Stdout, http.DefaultClient))
 }
 
-func run(args []string, stdout io.Writer) int {
+func run(args []string, stdout io.Writer, client *http.Client) int {
 
 	//no args
 	if len(args) < 1 {
@@ -52,7 +52,7 @@ func run(args []string, stdout io.Writer) int {
 		verbose := homeCmd.Bool("v", false, "verbose output")
 		homeCmd.Parse(args[1:])
 
-		resp, err := http.Get(*host + "/")
+		resp, err := client.Get(*host + "/")
 		if err != nil {
 			fmt.Fprintln(stdout, "error", err)
 			return 1
@@ -86,7 +86,7 @@ func run(args []string, stdout io.Writer) int {
 		//  get the actual value after parsing.
 
 		// remember id = 0 is default and will 404
-		resp, err := http.Get(fmt.Sprintf("%s/snippet/view/%d", *host, *id))
+		resp, err := client.Get(fmt.Sprintf("%s/snippet/view/%d", *host, *id))
 		if err != nil {
 			fmt.Fprintln(stdout, "error", err)
 			return 1
@@ -124,7 +124,7 @@ func run(args []string, stdout io.Writer) int {
 			fmt.Fprintln(stdout, "error:", err)
 			return 1
 		}
-		resp, err := http.Post(*host+"/snippet/create", "application/json", bytes.NewReader(payload))
+		resp, err := client.Post(*host+"/snippet/create", "application/json", bytes.NewReader(payload))
 		if err != nil {
 			fmt.Fprintln(stdout, "error", err)
 			return 1

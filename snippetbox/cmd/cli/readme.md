@@ -97,7 +97,7 @@ mkcert defaults to a reasonable key size (EC P-256)
 
 mkcert localhost
 
-NOTE: for test certs, i'm fine not gitignoring them.
+NOTE: for test certs, i'm fine not gitignoring them. but i would in production
 
 
 go test ./cmd/server/ -v
