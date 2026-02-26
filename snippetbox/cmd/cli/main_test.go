@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -68,6 +69,38 @@ func TestViewWithID(t *testing.T) {
 		t.Fatalf("expected exit 0, got %d", code)
 	}
 	if !strings.Contains(buf.String(), "snippet/view/1") {
+		t.Fatalf("unexpected body: %s", buf.String())
+	}
+}
+
+func TestCreateSnippet(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// verify it's a POST with JSON
+		if r.Method != "POST" {
+			t.Fatalf("expected POST, got %s", r.Method)
+		}
+		var input struct {
+			Title   string `json:"title"`
+			Content string `json:"content"`
+			Expires int    `json:"expires"`
+		}
+		err := json.NewDecoder(r.Body).Decode(&input)
+		if err != nil {
+			w.WriteHeader(400)
+			w.Write([]byte("bad json"))
+			return
+		}
+		w.WriteHeader(201)
+		w.Write([]byte("created: " + input.Title))
+	}))
+	defer ts.Close()
+
+	var buf bytes.Buffer
+	code := run([]string{"create", "--host", ts.URL, "--title", "Wasabi", "--content", "w", "--expires", "7"}, &buf)
+	if code != 0 {
+		t.Fatalf("expected exit 0, got %d", code)
+	}
+	if !strings.Contains(buf.String(), "created: Wasabi") {
 		t.Fatalf("unexpected body: %s", buf.String())
 	}
 }
