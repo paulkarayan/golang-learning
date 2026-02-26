@@ -101,3 +101,5 @@ NOTE: for test certs, i'm fine not gitignoring them. but i would in production
 
 
 go test ./cmd/server/ -v
+
+gotta chmod? no its fine, i got the path wrong.

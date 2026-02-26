@@ -37,6 +37,6 @@ func main() {
 
 	logger.Info("starting server on", "addr", *addr)
 
-	err := srv.ListenAndServeTLS("./tls/cert.pem", "./tls/key.pem")
+	err := srv.ListenAndServeTLS("./cmd/tls/localhost.pem", "./cmd/tls/localhost-key.pem")
 	logger.Error("handle error", "err", err)
 }
