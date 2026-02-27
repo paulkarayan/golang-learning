@@ -38,3 +38,40 @@ func startGRPCServer(t *testing.T) pb.SnippetBoxClient {
 
 	return pb.NewSnippetBoxClient(conn)
 }
+
+func TestGRPCHome(t *testing.T) {
+	client := startGRPCServer(t)
+	resp, err := client.Home(context.Background(), &pb.HomeRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Message != "Hello from Snippetbox" {
+		t.Fatalf("expected 'Hello from Snippetbox', got %q", resp.Message)
+	}
+}
+
+func TestGRPCGetSnippet(t *testing.T) {
+	client := startGRPCServer(t)
+	resp, err := client.GetSnippet(context.Background(), &pb.GetSnippetRequest{Id: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Snippet.Id != 1 {
+		t.Fatalf("expected id 1, got %d", resp.Snippet.Id)
+	}
+}
+
+func TestGRPCCreateSnippet(t *testing.T) {
+	client := startGRPCServer(t)
+	resp, err := client.CreateSnippet(context.Background(), &pb.CreateSnippetRequest{
+		Title:   "Wasabi",
+		Content: "wasabi with you?",
+		Expires: 7,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Snippet.Title != "Wasabi" {
+		t.Fatalf("expected 'Wasabi', got %q", resp.Snippet.Title)
+	}
+}
