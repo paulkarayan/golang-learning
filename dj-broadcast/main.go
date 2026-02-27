@@ -17,7 +17,7 @@ func newServer() http.Handler {
 
 	mux.HandleFunc("POST /station", createStation(sm))
 	mux.HandleFunc("POST /station/broadcast", broadcast(sm))
-	mux.HandleFunc("GET /station/listen", listen(sm))
+	mux.HandleFunc("GET /station/listen", subscribe(sm))
 	mux.HandleFunc("DELETE /station", deleteStation(sm))
 
 	return mux

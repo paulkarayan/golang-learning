@@ -61,3 +61,10 @@ A single goroutine (see NewBroadcaster) owns all the mutable state - the subscri
 The public methods (Subscribe, Unsubscribe, Send, Close) are just thin wrapper around message sending and reading to the appropriate channels. The monitor processes these one at a time in a select loop - that's what serializes access to the state.
 
 I use a mutex to protect the station map thats touched by goroutines calling Create, Get, Stop concurrently.
+
+
+# concerns
+
+for close...
+return exits the run() function, which kills the monitor goroutine.
+The channels on the Broadcaster struct (subscribeCh, sendCh, etc.) become orphaned — nobody's reading from them anymore. Any future calls to Subscribe, Send, etc. would block forever.
