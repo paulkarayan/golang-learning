@@ -25,6 +25,28 @@ scenarios to cover w tests:
 - cleanup happens upon disconnect
 - no deadlocks/blocking, no goroutine leaks (goleak)
 - we can scale to <some large number> of connections
-- a late client gets the full history
+- a late client gets the full history [how big can history get?]
 
 and also define how we want to handle dropped chunks... not sure.
+not because of slow reader because of network issues for example.
+ignore?
+
+# curl statements for basic functional testing
+
+# create a named station
+curl -X POST "localhost:8080/station?id=punk"
+
+# DJ sends data
+curl -X POST -d "Now playing: Time Bomb" "localhost:8080/station/broadcast?id=punk"
+ curl -X POST --data-binary @timebomb.mp3 "localhost:8080/station/broadcast?id=punk"
+
+# shut down station
+curl -X DELETE "localhost:8080/station?id=punk"
+
+# you can't listen to a nonexistant station
+curl localhost:8080/station/listen?id=nope # 404
+
+# open multiple listeners at once
+curl localhost:8080/station/listen?id=rock &
+curl localhost:8080/station/listen?id=rock &
+curl -X POST -d "hello vietnam" "localhost:8080/station/broadcast?id=rock"
