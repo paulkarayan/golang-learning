@@ -231,4 +231,15 @@ like requireRole middleware for HTTP
 -- Update the CLI — add gRPC as a transport option to sbox
 sbox view --grpc --id 1   [and make default grpc]
 
+i'm tired.
+
+curl -v --cacert cmd/tls/ca-cert.pem --cert cmd/tls/client-user-cert.pem --key cmd/tls/client-user-key.pem https://localhost:4000/
+
+ok so ...
+
+https://github.com/grpc/grpc-go/blob/master/examples/features/encryption/mTLS/server/main.go#L69
+
+we gotta add Certifcates
+
+
 -- Add streaming — e.g. a ListSnippets server-streaming RPC

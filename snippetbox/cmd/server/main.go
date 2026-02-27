@@ -93,12 +93,23 @@ func main() {
 	mux := http.NewServeMux()
 
 	// load CA
-	caCert, _ := os.ReadFile("./tls/ca-cert.pem")
+	caCert, _ := os.ReadFile("./cmd/tls/ca-cert.pem")
 	caCertPool := x509.NewCertPool()
 	caCertPool.AppendCertsFromPEM(caCert)
 
+	// separeate certifcates for grpc
+	serverCert, err := tls.LoadX509KeyPair(
+		"./cmd/tls/server-cert.pem",
+		"./cmd/tls/server-key.pem",
+	)
+	if err != nil {
+		logger.Error("load server cert", "err", err)
+		return
+	}
+
 	// just TLS 1.3
 	tlsConfig := &tls.Config{
+		Certificates:     []tls.Certificate{serverCert},
 		MinVersion:       tls.VersionTLS13,
 		CurvePreferences: []tls.CurveID{tls.X25519, tls.CurveP256},
 		ClientCAs:        caCertPool,
@@ -140,6 +151,6 @@ func main() {
 		}
 	}()
 
-	err := srv.ListenAndServeTLS("./cmd/tls/server-cert.pem", "./cmd/tls/server-key.pem")
+	err = srv.ListenAndServeTLS("./cmd/tls/server-cert.pem", "./cmd/tls/server-key.pem")
 	logger.Error("handle error", "err", err)
 }

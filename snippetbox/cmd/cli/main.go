@@ -2,12 +2,15 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+
+	pb "snippetbox.paulkarayan.com/cmd/proto"
 )
 
 // i have to change to this becuase otherwise args is global, os.Exit kills the process, and we dont capture stdout
@@ -49,25 +52,46 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 	case "home":
 		homeCmd := flag.NewFlagSet("home", flag.ExitOnError)
 		host := homeCmd.String("host", "https://localhost:4000", "server host")
+		grpcHost := homeCmd.String("grpc-host", "localhost:4001", "grpc server address")
 		role := homeCmd.String("role", "user", "user or admin")
 		verbose := homeCmd.Bool("v", false, "verbose output")
+		useHTTP := homeCmd.Bool("http", false, "use HTTP instead of gRPC")
 		homeCmd.Parse(args[1:])
 
-		if client == nil {
-			var err error
-			client, err = clientForRole(*role, "./cmd/tls/ca-cert.pem", "./cmd/tls")
+		if *useHTTP {
+			if client == nil {
+				var err error
+				client, err = clientForRole(*role, "./cmd/tls/ca-cert.pem", "./cmd/tls")
+				if err != nil {
+					fmt.Fprintln(stdout, "error:", err)
+					return 1
+				}
+			}
+
+			resp, err := makeRequest(client, "GET", *host+"/", nil)
+			if err != nil {
+				fmt.Fprintln(stdout, "error", err)
+				return 1
+			}
+			printResponse(resp, *verbose, stdout)
+		} else {
+			// do your grpc thing
+			conn, err := grpcConnForRole(*role, "./cmd/tls/ca-cert.pem", "./cmd/tls", *grpcHost)
 			if err != nil {
 				fmt.Fprintln(stdout, "error:", err)
 				return 1
 			}
-		}
+			defer conn.Close()
 
-		resp, err := makeRequest(client, "GET", *host+"/", nil)
-		if err != nil {
-			fmt.Fprintln(stdout, "error", err)
-			return 1
+			c := pb.NewSnippetBoxClient(conn)
+			resp, err := c.Home(context.Background(), &pb.HomeRequest{})
+			if err != nil {
+				fmt.Fprintln(stdout, "error:", err)
+				return 1
+			}
+
+			fmt.Fprintln(stdout, resp.Message)
 		}
-		printResponse(resp, *verbose, stdout)
 
 	//  sbox view --id 1 --role admin
 	case "view":

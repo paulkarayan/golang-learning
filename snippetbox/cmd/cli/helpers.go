@@ -7,6 +7,9 @@ import (
 	"io"
 	"net/http"
 	"os"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 func makeRequest(client *http.Client, method, url string, body io.Reader) (*http.Response, error) {
@@ -59,4 +62,37 @@ func clientForRole(role, caPath, certDir string) (*http.Client, error) {
 			},
 		},
 	}, nil
+}
+
+// same thing but for grpc
+func grpcConnForRole(role, caPath, certDir, grpcHost string) (*grpc.ClientConn, error) {
+	cert, err := tls.LoadX509KeyPair(
+		fmt.Sprintf("%s/client-%s-cert.pem", certDir, role),
+		fmt.Sprintf("%s/client-%s-key.pem", certDir, role),
+	)
+	if err != nil {
+		return nil, err
+	}
+	caCert, err := os.ReadFile(caPath)
+	if err != nil {
+		return nil, err
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCert)
+
+	tlsCfg := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		RootCAs:      caCertPool,
+		ServerName:   "localhost",
+	}
+	conn, err := grpc.NewClient(
+		grpcHost,
+		grpc.WithTransportCredentials(
+			credentials.NewTLS(tlsCfg),
+		),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return conn, nil
 }
