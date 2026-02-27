@@ -12,7 +12,7 @@ import (
 
 // i have to change to this becuase otherwise args is global, os.Exit kills the process, and we dont capture stdout
 func main() {
-	os.Exit(run(os.Args[1:], os.Stdout, http.DefaultClient))
+	os.Exit(run(os.Args[1:], os.Stdout, nil))
 }
 
 func run(args []string, stdout io.Writer, client *http.Client) int {
@@ -45,27 +45,36 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 		fmt.Fprintln(stdout, "  level:", *barLevel)
 		fmt.Fprintln(stdout, "  tail:", barCmd.Args())
 
-	//  sbox home -v
+	//  sbox home -v --role user
 	case "home":
 		homeCmd := flag.NewFlagSet("home", flag.ExitOnError)
 		host := homeCmd.String("host", "https://localhost:4000", "server host")
+		role := homeCmd.String("role", "user", "user or admin")
 		verbose := homeCmd.Bool("v", false, "verbose output")
-		token := homeCmd.String("token", "", "bearer auth token")
 		homeCmd.Parse(args[1:])
 
-		resp, err := makeRequest(client, "GET", *host+"/", *token, nil)
+		if client == nil {
+			var err error
+			client, err = clientForRole(*role, "./cmd/tls/ca-cert.pem", "./cmd/tls")
+			if err != nil {
+				fmt.Fprintln(stdout, "error:", err)
+				return 1
+			}
+		}
+
+		resp, err := makeRequest(client, "GET", *host+"/", nil)
 		if err != nil {
 			fmt.Fprintln(stdout, "error", err)
 			return 1
 		}
 		printResponse(resp, *verbose, stdout)
 
-	//  sbox view --id 1
+	//  sbox view --id 1 --role admin
 	case "view":
 		viewCmd := flag.NewFlagSet("view", flag.ExitOnError)
 		host := viewCmd.String("host", "https://localhost:4000", "server host")
 		id := viewCmd.Int("id", 0, "snippet id")
-		token := viewCmd.String("token", "", "bearer auth token")
+		role := viewCmd.String("role", "user", "user or admin")
 		verbose := viewCmd.Bool("v", false, "verbose output")
 
 		viewCmd.Parse(args[1:])
@@ -78,9 +87,18 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 		//  That's why you dereference with *host, *id, etc. — to
 		//  get the actual value after parsing.
 
+		if client == nil {
+			var err error
+			client, err = clientForRole(*role, "./cmd/tls/ca-cert.pem", "./cmd/tls")
+			if err != nil {
+				fmt.Fprintln(stdout, "error:", err)
+				return 1
+			}
+		}
+
 		// remember id = 0 is default and will 404
 		resp, err := makeRequest(client, "GET",
-			fmt.Sprintf("%s/snippet/view/%d", *host, *id), *token, nil)
+			fmt.Sprintf("%s/snippet/view/%d", *host, *id), nil)
 		if err != nil {
 			fmt.Fprintln(stdout, "error", err)
 			return 1
@@ -93,10 +111,19 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 		title := createCmd.String("title", "", "snippet title")
 		content := createCmd.String("content", "", "snippet content")
 		expires := createCmd.Int("expires", 7, "days until expiry")
-		token := createCmd.String("token", "", "bearer auth token")
+		role := createCmd.String("role", "admin", "user or admin")
 		verbose := createCmd.Bool("v", false, "verbose output")
 
 		createCmd.Parse(args[1:])
+
+		if client == nil {
+			var err error
+			client, err = clientForRole(*role, "./cmd/tls/ca-cert.pem", "./cmd/tls")
+			if err != nil {
+				fmt.Fprintln(stdout, "error:", err)
+				return 1
+			}
+		}
 
 		data := struct {
 			Title   string `json:"title"`
@@ -109,7 +136,7 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 			fmt.Fprintln(stdout, "error:", err)
 			return 1
 		}
-		resp, err := makeRequest(client, "POST", *host+"/snippet/create", *token, bytes.NewReader(payload))
+		resp, err := makeRequest(client, "POST", *host+"/snippet/create", bytes.NewReader(payload))
 		if err != nil {
 			fmt.Fprintln(stdout, "error", err)
 			return 1
@@ -119,7 +146,7 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 
 	// wrong args
 	default:
-		fmt.Fprintln(stdout, "expected 'foo' or 'bar' or 'home' or 'view' subcommands")
+		fmt.Fprintln(stdout, "expected 'foo' or 'bar' or 'home' or 'view' or 'create' subcommands")
 		return 1
 	}
 	return 0

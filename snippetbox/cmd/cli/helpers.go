@@ -1,18 +1,18 @@
 package main
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 )
 
-func makeRequest(client *http.Client, method, url, token string, body io.Reader) (*http.Response, error) {
+func makeRequest(client *http.Client, method, url string, body io.Reader) (*http.Response, error) {
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return nil, err
-	}
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
 	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
@@ -32,4 +32,31 @@ func printResponse(resp *http.Response, verbose bool, stdout io.Writer) {
 		fmt.Fprintln(stdout, "---")
 	}
 	fmt.Fprintln(stdout, string(body))
+}
+
+// we are going to look up the correct cert and key for the role
+// cuz we're so nice
+func clientForRole(role, caPath, certDir string) (*http.Client, error) {
+	cert, err := tls.LoadX509KeyPair(
+		fmt.Sprintf("%s/client-%s-cert.pem", certDir, role),
+		fmt.Sprintf("%s/client-%s-key.pem", certDir, role),
+	)
+	if err != nil {
+		return nil, err
+	}
+	caCert, err := os.ReadFile(caPath)
+	if err != nil {
+		return nil, err
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCert)
+
+	return &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				RootCAs:      caCertPool,
+				Certificates: []tls.Certificate{cert},
+			},
+		},
+	}, nil
 }

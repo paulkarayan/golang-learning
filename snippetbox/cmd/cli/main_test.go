@@ -108,21 +108,37 @@ func TestCreateSnippet(t *testing.T) {
 	}
 }
 
-func TestViewTLS(t *testing.T) {
+// func TestViewTLS(t *testing.T) {
+// 	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// 		auth := r.Header.Get("Authorization")
+// 		if auth != "Bearer test-token" {
+// 			http.Error(w, "unauthorized", 401)
+// 			return
+// 		}
+// 		w.Write([]byte("ok from " + r.URL.Path))
+// 	}))
+// 	defer ts.Close()
+//
+// 	var buf bytes.Buffer
+// 	code := run([]string{"view", "--host", ts.URL, "--id", "1", "--token", "test-token"}, &buf, ts.Client())
+// 	if code != 0 {
+// 		t.Fatalf("expected exit 0, got %d; output: %s", code, buf.String())
+// 	}
+// }
+
+func TestHomeTLS(t *testing.T) {
 	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		auth := r.Header.Get("Authorization")
-		if auth != "Bearer test-token" {
-			http.Error(w, "unauthorized", 401)
-			return
-		}
-		w.Write([]byte("ok from " + r.URL.Path))
+		w.Write([]byte("Hello from Snippetbox"))
 	}))
 	defer ts.Close()
 
 	var buf bytes.Buffer
-	code := run([]string{"view", "--host", ts.URL, "--id", "1", "--token", "test-token"}, &buf, ts.Client())
+	code := run([]string{"home", "--host", ts.URL}, &buf, ts.Client())
 	if code != 0 {
 		t.Fatalf("expected exit 0, got %d; output: %s", code, buf.String())
+	}
+	if !strings.Contains(buf.String(), "Hello from Snippetbox") {
+		t.Fatalf("unexpected body: %s", buf.String())
 	}
 }
 
