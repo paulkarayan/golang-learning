@@ -10,6 +10,7 @@ to cover:
 - all listeners get the same output, from the start of broadcast
 - no polling, no busy-waiting
 - not just text, should handle binary
+- assume in-memory state is fine
 
 routes look like:
 
@@ -33,12 +34,13 @@ ignore?
 
 # curl statements for basic functional testing
 
+```
 # create a named station
 curl -X POST "localhost:8080/station?id=punk"
 
 # DJ sends data
 curl -X POST -d "Now playing: Time Bomb" "localhost:8080/station/broadcast?id=punk"
- curl -X POST --data-binary @timebomb.mp3 "localhost:8080/station/broadcast?id=punk"
+curl -X POST --data-binary @timebomb.mp3 "localhost:8080/station/broadcast?id=punk"
 
 # shut down station
 curl -X DELETE "localhost:8080/station?id=punk"
@@ -50,3 +52,12 @@ curl localhost:8080/station/listen?id=nope # 404
 curl localhost:8080/station/listen?id=rock &
 curl localhost:8080/station/listen?id=rock &
 curl -X POST -d "hello vietnam" "localhost:8080/station/broadcast?id=rock"
+```
+
+# explaining the concurrency so an idiot (namely me) can understand it
+
+A single goroutine (see NewBroadcaster) owns all the mutable state - the subscriber map and the history buffer.
+
+The public methods (Subscribe, Unsubscribe, Send, Close) are just thin wrapper around message sending and reading to the appropriate channels. The monitor processes these one at a time in a select loop - that's what serializes access to the state.
+
+I use a mutex to protect the station map thats touched by goroutines calling Create, Get, Stop concurrently.
