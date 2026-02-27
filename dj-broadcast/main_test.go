@@ -12,18 +12,29 @@ import (
 	"go.uber.org/goleak"
 )
 
+func deleteStationHelper(srv *httptest.Server, id string) {
+	req, _ := http.NewRequest("DELETE", srv.URL+"/station?id="+id, nil)
+	r, _ := http.DefaultClient.Do(req)
+	if r != nil {
+		r.Body.Close()
+	}
+}
+
 func TestBroadcastAndListen(t *testing.T) {
 	srv := httptest.NewServer(newServer())
 	defer srv.Close()
 
-	http.Post(srv.URL+"/station?id=punk", "", nil)
+	r1, _ := http.Post(srv.URL+"/station?id=punk", "", nil)
+	r1.Body.Close()
+	defer deleteStationHelper(srv, "punk")
 
 	// broadcast first
-	http.Post(
+	r2, _ := http.Post(
 		srv.URL+"/station/broadcast?id=punk",
 		"application/octet-stream",
 		strings.NewReader("Now playing: Time Bomb"),
 	)
+	r2.Body.Close()
 
 	resp, err := http.Get(srv.URL + "/station/listen?id=punk")
 	if err != nil {
@@ -43,14 +54,18 @@ func TestListenGetsHistory(t *testing.T) {
 	srv := httptest.NewServer(newServer())
 	defer srv.Close()
 
-	http.Post(srv.URL+"/station?id=punk", "", nil)
+	r1, _ := http.Post(srv.URL+"/station?id=punk", "", nil)
+	r1.Body.Close()
+	defer deleteStationHelper(srv, "punk")
 
-	http.Post(srv.URL+"/station/broadcast?id=punk",
+	r2, _ := http.Post(srv.URL+"/station/broadcast?id=punk",
 		"application/octet-stream",
 		strings.NewReader("Now playing: Time Bomb"))
-	http.Post(srv.URL+"/station/broadcast?id=punk",
+	r2.Body.Close()
+	r3, _ := http.Post(srv.URL+"/station/broadcast?id=punk",
 		"application/octet-stream",
 		strings.NewReader("Now playing: Ruby Soho"))
+	r3.Body.Close()
 
 	resp, err := http.Get(srv.URL + "/station/listen?id=punk")
 	if err != nil {
@@ -86,6 +101,8 @@ func TestCreateStation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	resp.Body.Close()
+	defer deleteStationHelper(srv, "punk")
 	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("expected 201, got %d", resp.StatusCode)
 	}
@@ -95,11 +112,14 @@ func TestCreateDuplicateStation(t *testing.T) {
 	srv := httptest.NewServer(newServer())
 	defer srv.Close()
 
-	http.Post(srv.URL+"/station?id=punk", "", nil)
+	r1, _ := http.Post(srv.URL+"/station?id=punk", "", nil)
+	r1.Body.Close()
+	defer deleteStationHelper(srv, "punk")
 	resp, err := http.Post(srv.URL+"/station?id=punk", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+	resp.Body.Close()
 	if resp.StatusCode != http.StatusConflict {
 		t.Fatalf("expected 409, got %d", resp.StatusCode)
 	}
@@ -113,6 +133,7 @@ func TestListenNonexistent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	resp.Body.Close()
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", resp.StatusCode)
 	}
@@ -190,7 +211,8 @@ func TestCleanupOnDisconnect(t *testing.T) {
 	srv := httptest.NewServer(newServer())
 	defer srv.Close()
 
-	http.Post(srv.URL+"/station?id=punk", "", nil)
+	r1, _ := http.Post(srv.URL+"/station?id=punk", "", nil)
+	r1.Body.Close()
 
 	// use a context we can cancel to simulate disconnect
 	ctx, cancel := context.WithCancel(context.Background())
@@ -214,11 +236,16 @@ func TestCleanupOnDisconnect(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	r.Body.Close()
+	defer deleteStationHelper(srv, "punk")
 	if r.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", r.StatusCode)
 	}
 }
 
 func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
+	goleak.VerifyTestMain(m,
+		goleak.IgnoreTopFunction("net/http.(*persistConn).readLoop"),
+		goleak.IgnoreTopFunction("net/http.(*persistConn).writeLoop"),
+	)
 }

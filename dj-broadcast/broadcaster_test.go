@@ -121,6 +121,7 @@ func TestStationManagerCreate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer sm.Stop("rock")
 	b, ok := sm.Get("rock")
 	if !ok {
 		t.Fatal("expected station to exist")
@@ -133,6 +134,7 @@ func TestStationManagerCreate(t *testing.T) {
 func TestStationManagerDuplicateCreate(t *testing.T) {
 	sm := NewStationManager()
 	sm.Create("rock")
+	defer sm.Stop("rock")
 	err := sm.Create("rock")
 	if err == nil {
 		t.Fatal("expected error for duplicate station")
