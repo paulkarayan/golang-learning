@@ -1,11 +1,29 @@
 package main
 
-import "sync"
+import (
+	"sync"
+)
 
 // using mutex here to protect the station map.
 type StationManager struct {
 	mu       sync.Mutex
 	stations map[string]*Broadcaster
+}
+
+func NewStationManager() *StationManager {
+	// init map
+}
+
+func (sm *StationManager) Create(id string) error {
+	// lock, check if exists, create broadcaster
+}
+
+func (sm *StationManager) Get(id string) (*Broadcaster, bool) {
+	// lock, lookup
+}
+
+func (sm *StationManager) Stop(id string) error {
+	// lock, close broadcaster, delete from map
 }
 
 // use the monitor goroutine pattern a la bank example
@@ -14,7 +32,9 @@ type Broadcaster struct {
 	unsubscribeCh chan int
 	sendCh        chan []byte
 	closeCh       chan struct{}
-	history       [][]byte
+	// claude points out that this should be in run() because other goroutines could
+	// access it here. but they wont, and i have agency. lol
+	history [][]byte
 }
 
 type subRequest struct {
@@ -28,23 +48,41 @@ type subResponse struct {
 
 // the goroutine (monitor) here is the only one that reads from channels, touches
 // the state in the station map and history
+// NOTE: see the history comment above. i'm not correct.
 func NewBroadcaster() *Broadcaster {
-	// init channels
+	b := &Broadcaster{
+		subscribeCh:   make(chan subRequest),
+		unsubscribeCh: make(chan int),
+		sendCh:        make(chan []byte),
+		closeCh:       make(chan struct{}),
+	}
 	// go b.run() — start the monitor goroutine, which runs until Close
-
+	go b.run()
+	return b
 }
 
 func (b *Broadcaster) run() {
 	subscribers := make(map[int]chan []byte)
+	// note: var is more idiomatic if you dont need initialize w values apparently
+	history := [][]byte{}
 	nextID := 0
 
 	for {
 		select {
 		case req := <-b.subscribeCh:
-			// assign id, make channel
+			// assign id
+			id := nextID
+			nextID++
+			// make channel
+			// aribtary 10 message buffer, would tune for slow client behavior
+			ch := make(chan []byte, 10)
 			// send history
-			// add to map
-			// reply via req.resp
+			for _, h := range history {
+				ch <- h
+			}
+
+			// add to map and reply via req.resp
+			req.resp <- subResponse{id: id, ch: ch}
 
 		case id := <-b.unsubscribeCh:
 			// close channel, delete from map
