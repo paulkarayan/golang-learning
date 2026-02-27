@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func TestBroadcasterSendReceive(t *testing.T) {
 	b := NewBroadcaster()
@@ -8,6 +11,7 @@ func TestBroadcasterSendReceive(t *testing.T) {
 
 	id, ch := b.Subscribe()
 	_ = id
+	fmt.Println("subscribed with id:", id, "ch:", ch)
 
 	b.Send([]byte("ahoy hoy"))
 
