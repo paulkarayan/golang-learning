@@ -158,7 +158,7 @@ func TestMTLSAcceptsValidClientCert(t *testing.T) {
 	caCertPool.AddCert(ts.Certificate())
 
 	// client WITH valid client cert
-	cert, _ := tls.LoadX509KeyPair("../tls/client-cert.pem", "../tls/client-key.pem")
+	cert, _ := tls.LoadX509KeyPair("../tls/client-admin-cert.pem", "../tls/client-admin-key.pem")
 	client := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
