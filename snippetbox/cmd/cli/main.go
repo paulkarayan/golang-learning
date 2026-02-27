@@ -50,29 +50,22 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 		homeCmd := flag.NewFlagSet("home", flag.ExitOnError)
 		host := homeCmd.String("host", "https://localhost:4000", "server host")
 		verbose := homeCmd.Bool("v", false, "verbose output")
+		token := homeCmd.String("token", "", "bearer auth token")
 		homeCmd.Parse(args[1:])
 
-		resp, err := client.Get(*host + "/")
+		resp, err := makeRequest(client, "GET", *host+"/", *token, nil)
 		if err != nil {
 			fmt.Fprintln(stdout, "error", err)
 			return 1
 		}
-		defer resp.Body.Close()
-		body, _ := io.ReadAll(resp.Body)
-		if *verbose {
-			fmt.Fprintln(stdout, "Status:", resp.Status)
-			for k, v := range resp.Header {
-				fmt.Fprintf(stdout, "%s: %s\n", k, v)
-			}
-			fmt.Fprintln(stdout, "---")
-		}
-		fmt.Fprintln(stdout, string(body))
+		printResponse(resp, *verbose, stdout)
 
 	//  sbox view --id 1
 	case "view":
 		viewCmd := flag.NewFlagSet("view", flag.ExitOnError)
 		host := viewCmd.String("host", "https://localhost:4000", "server host")
 		id := viewCmd.Int("id", 0, "snippet id")
+		token := viewCmd.String("token", "", "bearer auth token")
 		verbose := viewCmd.Bool("v", false, "verbose output")
 
 		viewCmd.Parse(args[1:])
@@ -86,22 +79,13 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 		//  get the actual value after parsing.
 
 		// remember id = 0 is default and will 404
-		resp, err := client.Get(fmt.Sprintf("%s/snippet/view/%d", *host, *id))
+		resp, err := makeRequest(client, "GET",
+			fmt.Sprintf("%s/snippet/view/%d", *host, *id), *token, nil)
 		if err != nil {
 			fmt.Fprintln(stdout, "error", err)
 			return 1
 		}
-
-		defer resp.Body.Close()
-		body, _ := io.ReadAll(resp.Body)
-		if *verbose {
-			fmt.Fprintln(stdout, "Status:", resp.Status)
-			for k, v := range resp.Header {
-				fmt.Fprintf(stdout, "%s: %s\n", k, v)
-			}
-			fmt.Fprintln(stdout, "---")
-		}
-		fmt.Fprintln(stdout, string(body))
+		printResponse(resp, *verbose, stdout)
 
 	case "create":
 		createCmd := flag.NewFlagSet("create", flag.ExitOnError)
@@ -109,6 +93,7 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 		title := createCmd.String("title", "", "snippet title")
 		content := createCmd.String("content", "", "snippet content")
 		expires := createCmd.Int("expires", 7, "days until expiry")
+		token := createCmd.String("token", "", "bearer auth token")
 		verbose := createCmd.Bool("v", false, "verbose output")
 
 		createCmd.Parse(args[1:])
@@ -124,23 +109,13 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 			fmt.Fprintln(stdout, "error:", err)
 			return 1
 		}
-		resp, err := client.Post(*host+"/snippet/create", "application/json", bytes.NewReader(payload))
+		resp, err := makeRequest(client, "POST", *host+"/snippet/create", *token, bytes.NewReader(payload))
 		if err != nil {
 			fmt.Fprintln(stdout, "error", err)
 			return 1
 		}
 
-		defer resp.Body.Close()
-
-		body, _ := io.ReadAll(resp.Body)
-		if *verbose {
-			fmt.Fprintln(stdout, "Status:", resp.Status)
-			for k, v := range resp.Header {
-				fmt.Fprintf(stdout, "%s: %s\n", k, v)
-			}
-			fmt.Fprintln(stdout, "---")
-		}
-		fmt.Fprintln(stdout, string(body))
+		printResponse(resp, *verbose, stdout)
 
 	// wrong args
 	default:

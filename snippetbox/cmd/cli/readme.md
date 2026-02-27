@@ -127,3 +127,11 @@ With TLS 1.3, Go uses all three and you can't change
 
 https://www.alexedwards.net/blog/basic-authentication-in-go
 ^^ follow a pattern like this
+
+and then did a refactor...
+
+sbox view --id 1 --token hardcode
+
+Display a specific snippet with ID 1...
+
+--- let's do mtls

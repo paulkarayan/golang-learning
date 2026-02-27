@@ -28,7 +28,7 @@ func bearerAuthMiddleware(token string, next http.HandlerFunc) http.HandlerFunc 
 
 func main() {
 	addr := flag.String("addr", ":4000", "HTTP network address")
-	token := flag.String("token", "dev-hardcoded-secret", "bearer auth token")
+	token := flag.String("token", "hardcode", "bearer auth token")
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
