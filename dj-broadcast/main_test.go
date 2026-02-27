@@ -53,9 +53,17 @@ func TestListenGetsHistory(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	buf := make([]byte, 1024)
-	n, _ := resp.Body.Read(buf)
-	body := string(buf[:n])
+	// we observed this test hanging. so we need to deal with
+	//  http.Get blocking until the server sends headers + starts the body
+
+	done := make(chan string)
+	go func() {
+		buf := make([]byte, 1024)
+		n, _ := resp.Body.Read(buf)
+		done <- string(buf[:n])
+	}()
+
+	body := <-done
 
 	if !strings.Contains(body, "Time Bomb") {
 		t.Fatalf("expected Time Bomb in history, got %q", body)

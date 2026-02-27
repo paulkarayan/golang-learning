@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 )
 
@@ -99,6 +100,17 @@ func subscribe(sm *StationManager) http.HandlerFunc {
 
 func broadcast(sm *StationManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// sm.Send(id)
+		id := r.URL.Query().Get("id")
+		b, ok := sm.Get(id)
+		if !ok {
+			http.Error(w, "station not found", http.StatusNotFound)
+			return
+		}
+		data, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "bad body", http.StatusBadRequest)
+			return
+		}
+		b.Send(data)
 	}
 }
