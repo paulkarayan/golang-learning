@@ -12,24 +12,49 @@ type StationManager struct {
 }
 
 func NewStationManager() *StationManager {
-	// init map
-	return nil
-
+	return &StationManager{
+		stations: make(map[string]*Broadcaster),
+	}
 }
 
 func (sm *StationManager) Create(id string) error {
-	// lock, check if exists, create broadcaster
+	// lock, check if exists,
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+
+	if _, ok := sm.stations[id]; ok {
+		return fmt.Errorf("station %s already exists", id)
+	}
+
+	// create broadcaster
+	sm.stations[id] = NewBroadcaster()
+	// Go functions that return error return nil on success
 	return nil
 }
 
 func (sm *StationManager) Get(id string) (*Broadcaster, bool) {
-	// lock, lookup
-	return nil, false
+	// lock,
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	// lookup
 
+	b, ok := sm.stations[id]
+	return b, ok
 }
 
 func (sm *StationManager) Stop(id string) error {
-	// lock, close broadcaster, delete from map
+	// lock
+
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	// close broadcaster after finding by id
+	b, ok := sm.stations[id]
+	if !ok {
+		return fmt.Errorf("station %s not found", id)
+	}
+	b.Close()
+	// delete from map
+	delete(sm.stations, id)
 	return nil
 
 }
