@@ -45,7 +45,7 @@ func requireRole(role string, next http.HandlerFunc) http.HandlerFunc {
 
 func main() {
 	addr := flag.String("addr", ":4000", "HTTP network address")
-	token := flag.String("token", "hardcode", "bearer auth token")
+	// token := flag.String("token", "hardcode", "bearer auth token")
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
@@ -75,9 +75,9 @@ func main() {
 	}
 
 	mux.HandleFunc("GET /{$}", home)
-	mux.HandleFunc("GET /snippet/view/{id}", bearerAuthMiddleware(*token, snippetView))
-	mux.HandleFunc("GET /snippet/create", bearerAuthMiddleware(*token, snippetCreate))
-	mux.HandleFunc("POST /snippet/create", bearerAuthMiddleware(*token, snippetCreatePost))
+	mux.HandleFunc("GET /snippet/view/{id}", requireRole("user", snippetView))
+	mux.HandleFunc("GET /snippet/create", requireRole("user", snippetCreate))
+	mux.HandleFunc("POST /snippet/create", requireRole("admin", snippetCreatePost))
 
 	logger.Info("starting server on", "addr", *addr)
 

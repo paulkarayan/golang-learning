@@ -139,7 +139,7 @@ func TestServerTLS(t *testing.T) {
 // }
 
 func TestMTLSAcceptsValidClientCert(t *testing.T) {
-	caCert, _ := os.ReadFile("./tls/ca-cert.pem")
+	caCert, _ := os.ReadFile("../tls/ca-cert.pem")
 	caCertPool := x509.NewCertPool()
 	caCertPool.AppendCertsFromPEM(caCert)
 
@@ -154,9 +154,11 @@ func TestMTLSAcceptsValidClientCert(t *testing.T) {
 	ts.StartTLS()
 	defer ts.Close()
 
+	// trust test server's cert
+	caCertPool.AddCert(ts.Certificate())
+
 	// client WITH valid client cert
-	cert, _ := tls.LoadX509KeyPair("./tls/client-admin-cert.pem",
-		"./tls/client-admin-key.pem")
+	cert, _ := tls.LoadX509KeyPair("../tls/client-cert.pem", "../tls/client-key.pem")
 	client := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
