@@ -12,18 +12,25 @@ type StationManager struct {
 
 func NewStationManager() *StationManager {
 	// init map
+	return nil
+
 }
 
 func (sm *StationManager) Create(id string) error {
 	// lock, check if exists, create broadcaster
+	return nil
 }
 
 func (sm *StationManager) Get(id string) (*Broadcaster, bool) {
 	// lock, lookup
+	return nil, false
+
 }
 
 func (sm *StationManager) Stop(id string) error {
 	// lock, close broadcaster, delete from map
+	return nil
+
 }
 
 // use the monitor goroutine pattern a la bank example
@@ -116,16 +123,24 @@ func (b *Broadcaster) run() {
 
 func (b *Broadcaster) Subscribe() (int, chan []byte) {
 	// send subRequest, wait for response
+	req := subRequest{resp: make(chan subResponse)}
+	b.subscribeCh <- req
+	res := <-req.resp
+	return res.id, res.ch
 }
 
 func (b *Broadcaster) Unsubscribe(id int) {
 	// send id to unsubscribeCh
+	b.unsubscribeCh <- id
 }
 
 func (b *Broadcaster) Send(data []byte) {
 	// send data to sendCh
+	b.sendCh <- data
 }
 
 func (b *Broadcaster) Close() {
 	// send to closeCh
+	// apparently this is a convention for signal only channel as 0 byte
+	b.closeCh <- struct{}{}
 }
