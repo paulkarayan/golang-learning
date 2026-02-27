@@ -224,3 +224,11 @@ this was self signed gdi
 openssl req -new -key cmd/tls/server-key.pem -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost,IP:127.0.0.1" -out cmd/tls/server.csr
 
 openssl x509 -req -in cmd/tls/server.csr -CA cmd/tls/ca-cert.pem -CAkey cmd/tls/ca-key.pem -CAcreateserial -out cmd/tls/server-cert.pem -days 365 -extfile <(echo                        "subjectAltName=DNS:localhost,IP:127.0.0.1")
+
+--- gRPC interceptor for role-based auth
+like requireRole middleware for HTTP
+
+-- Update the CLI — add gRPC as a transport option to sbox
+sbox view --grpc --id 1   [and make default grpc]
+
+-- Add streaming — e.g. a ListSnippets server-streaming RPC

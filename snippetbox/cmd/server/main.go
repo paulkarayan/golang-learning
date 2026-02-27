@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"flag"
@@ -11,7 +12,10 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/peer"
+	"google.golang.org/grpc/status"
 	pb "snippetbox.paulkarayan.com/cmd/proto"
 )
 
@@ -45,6 +49,37 @@ func requireRole(role string, next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		next(w, r)
+	}
+}
+
+// map method → role, same as map HTTP route → role.
+func roleInterceptor() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo,
+		handler grpc.UnaryHandler) (interface{}, error) {
+		// figure out which role this method needs
+		var role string
+		switch info.FullMethod {
+		case "/snippetbox.SnippetBox/CreateSnippet":
+			role = "admin"
+		default:
+			role = "user"
+		}
+
+		// same cert check as before
+		// note that we use context the way i use a request object for http
+		p, ok := peer.FromContext(ctx)
+		if !ok {
+			return nil, status.Error(codes.Unauthenticated, "no peer info")
+		}
+		tlsInfo, ok := p.AuthInfo.(credentials.TLSInfo)
+		if !ok || len(tlsInfo.State.PeerCertificates) == 0 {
+			return nil, status.Error(codes.Unauthenticated, "no client cert")
+		}
+		cn := tlsInfo.State.PeerCertificates[0].Subject.CommonName
+		if cn != role && cn != "admin" {
+			return nil, status.Error(codes.PermissionDenied, "forbidden: requires "+role)
+		}
+		return handler(ctx, req)
 	}
 }
 
@@ -89,10 +124,10 @@ func main() {
 	// now grpc
 
 	creds := credentials.NewTLS(tlsConfig)
-	grpcSrv := grpc.NewServer(grpc.Creds(creds))
+	grpcSrv := grpc.NewServer(grpc.Creds(creds), grpc.UnaryInterceptor(roleInterceptor()))
 	pb.RegisterSnippetBoxServer(grpcSrv, &grpcServer{})
 
-	// we have to do this in goroutine so we can run both
+	// we have to do this in goroutine so we can run second server wo blocking
 	go func() {
 		lis, err := net.Listen("tcp", ":4001")
 		if err != nil {

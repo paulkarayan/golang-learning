@@ -130,3 +130,57 @@ func TestGRPCWithMTLS(t *testing.T) {
 		t.Fatalf("expected 'Hello from Snippetbox', got %q", resp.Message)
 	}
 }
+
+// equivalent of createRole tests w diff. transport layer
+func TestGRPCInterceptorRejectsUserOnCreate(t *testing.T) {
+	// same server setup as TestGRPCWithMTLS but with the interceptor
+	caCert, _ := os.ReadFile("../tls/ca-cert.pem")
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCert)
+
+	serverCert, _ := tls.LoadX509KeyPair("../tls/server-cert.pem", "../tls/server-key.pem")
+	serverTLS := &tls.Config{
+		Certificates: []tls.Certificate{serverCert},
+		ClientCAs:    caCertPool,
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+	}
+
+	lis, _ := net.Listen("tcp", "localhost:0")
+	s := grpc.NewServer(
+		grpc.Creds(credentials.NewTLS(serverTLS)),
+		grpc.UnaryInterceptor(roleInterceptor()),
+	)
+	pb.RegisterSnippetBoxServer(s, &grpcServer{})
+	go func() { s.Serve(lis) }()
+	t.Cleanup(func() { s.Stop() })
+
+	// user cert, NOT admin
+	clientCert, _ := tls.LoadX509KeyPair("../tls/client-user-cert.pem",
+		"../tls/client-user-key.pem")
+	clientTLS := &tls.Config{
+		Certificates: []tls.Certificate{clientCert},
+		RootCAs:      caCertPool,
+		ServerName:   "localhost",
+	}
+
+	conn, _ := grpc.NewClient(lis.Addr().String(),
+		grpc.WithTransportCredentials(credentials.NewTLS(clientTLS)),
+	)
+	defer conn.Close()
+
+	client := pb.NewSnippetBoxClient(conn)
+
+	// CreateSnippet should fail — user doesn't have admin role
+	_, err := client.CreateSnippet(context.Background(), &pb.CreateSnippetRequest{
+		Title: "test", Content: "test", Expires: 7,
+	})
+	if err == nil {
+		t.Fatal("expected error, user should not be able to create")
+	}
+
+	// GetSnippet should succeed — user has user role
+	_, err = client.GetSnippet(context.Background(), &pb.GetSnippetRequest{Id: 1})
+	if err != nil {
+		t.Fatalf("expected success for GetSnippet, got %v", err)
+	}
+}
