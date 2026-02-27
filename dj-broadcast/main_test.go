@@ -1,11 +1,15 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
+
+	"go.uber.org/goleak"
 )
 
 func TestBroadcastAndListen(t *testing.T) {
@@ -180,4 +184,41 @@ loop:
 	// we wouldnt get to this point if slow reader blocked Send
 	// but we're just suppressing the unused var error
 	_ = slow
+}
+
+func TestCleanupOnDisconnect(t *testing.T) {
+	srv := httptest.NewServer(newServer())
+	defer srv.Close()
+
+	http.Post(srv.URL+"/station?id=punk", "", nil)
+
+	// use a context we can cancel to simulate disconnect
+	ctx, cancel := context.WithCancel(context.Background())
+	req, _ := http.NewRequestWithContext(
+		ctx, "GET",
+		srv.URL+"/station/listen?id=punk", nil)
+
+	go http.DefaultClient.Do(req)
+
+	time.Sleep(100 * time.Millisecond)
+
+	// cancel simulates client disconnect
+	cancel()
+
+	// broadcast should still work (no panic, no hang)
+	r, err := http.Post(
+		srv.URL+"/station/broadcast?id=punk",
+		"application/octet-stream",
+		strings.NewReader("still alive"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", r.StatusCode)
+	}
+}
+
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
 }

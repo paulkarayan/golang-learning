@@ -68,3 +68,39 @@ I use a mutex to protect the station map thats touched by goroutines calling Cre
 for close...
 return exits the run() function, which kills the monitor goroutine.
 The channels on the Broadcaster struct (subscribeCh, sendCh, etc.) become orphaned — nobody's reading from them anymore. Any future calls to Subscribe, Send, etc. would block forever.
+
+
+
+# debugging
+
+finally i am annoyed enough at the subscription disconnect test i am going to use
+this instead of a print statement
+
+go install github.com/go-delve/delve/cmd/dlv@latest
+
+dlv test -- -test.run TestCleanupOnDisconnect -test.timeout 10s
+
+// set the breakpoint to r.Context().Done()
+break main.go:93
+continue
+
+// hangs... ctrl c
+
+> [unrecovered-panic] runtime.fatalpanic() /opt/homebrew/opt/go/libexec/src/runtime/panic.go:1298 (hits goroutine(29):1 total:1) (PC: 0x104d90d50)
+
+
+goroutine 29
+bt
+
+
+// run without optimized binary??
+// nope doesnt work
+
+dlv test -- -test.run TestCleanupOnDisconnect
+
+// no... let's go easy again
+go test -v -run TestCleanupOnDisconnect -timeout 10s 2>&1
+
+// fails here:
+dj-broadcast.TestCleanupOnDisconnect(0x14000100700)
+        /Users/pk/golang-learning/dj-broadcast/main_test.go:193 +0xd4
