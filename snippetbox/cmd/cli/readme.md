@@ -202,7 +202,7 @@ protoc --version && protoc-gen-go --version && protoc-gen-go-grpc --version
 
 message HomeRequest {}  <--- this is empty because its a bare request
 
-protoc --go_out=. --go-grpc_out=. cmd/proto/snippetbox.proto
+protoc --go_out=. --go-grpc_out=. snippetbox.proto
 
 uhh looks fine?
 
@@ -210,3 +210,17 @@ go get google.golang.org/grpc/test/bufconn
 
 no relative imports?!?
 pb "snippetbox/cmd/proto"
+
+
+i dont have a SAN entry and i dont want to change it.
+InsecureSkipVerify: true,
+
+but that's lame
+
+openssl req -new -x509 -key ./cmd/tls/server-key.pem -out ./cmd/tls/server-cert.pem -days 365 -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
+
+this was self signed gdi
+
+openssl req -new -key cmd/tls/server-key.pem -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost,IP:127.0.0.1" -out cmd/tls/server.csr
+
+openssl x509 -req -in cmd/tls/server.csr -CA cmd/tls/ca-cert.pem -CAkey cmd/tls/ca-key.pem -CAcreateserial -out cmd/tls/server-cert.pem -days 365 -extfile <(echo                        "subjectAltName=DNS:localhost,IP:127.0.0.1")

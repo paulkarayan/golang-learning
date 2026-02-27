@@ -5,9 +5,14 @@ import (
 	"crypto/x509"
 	"flag"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"time"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	pb "snippetbox.paulkarayan.com/cmd/proto"
 )
 
 // func bearerAuthMiddleware(token string, next http.HandlerFunc) http.HandlerFunc {
@@ -80,6 +85,25 @@ func main() {
 	mux.HandleFunc("POST /snippet/create", requireRole("admin", snippetCreatePost))
 
 	logger.Info("starting server on", "addr", *addr)
+
+	// now grpc
+
+	creds := credentials.NewTLS(tlsConfig)
+	grpcSrv := grpc.NewServer(grpc.Creds(creds))
+	pb.RegisterSnippetBoxServer(grpcSrv, &grpcServer{})
+
+	// we have to do this in goroutine so we can run both
+	go func() {
+		lis, err := net.Listen("tcp", ":4001")
+		if err != nil {
+			logger.Error("grpc listen", "err", err)
+			return
+		}
+		logger.Info("starting grpc server on", "addr", ":4001")
+		if err := grpcSrv.Serve(lis); err != nil {
+			logger.Error("grpc serve", "err", err)
+		}
+	}()
 
 	err := srv.ListenAndServeTLS("./cmd/tls/server-cert.pem", "./cmd/tls/server-key.pem")
 	logger.Error("handle error", "err", err)
