@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.1
 // - protoc             v6.33.4
-// source: cmd/proto/snippetbox.proto
+// source: snippetbox.proto
 
 package proto
 
@@ -193,5 +193,5 @@ var SnippetBox_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "cmd/proto/snippetbox.proto",
+	Metadata: "snippetbox.proto",
 }

@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v6.33.4
-// source: cmd/proto/snippetbox.proto
+// source: snippetbox.proto
 
 package proto
 
@@ -33,7 +33,7 @@ type Snippet struct {
 
 func (x *Snippet) Reset() {
 	*x = Snippet{}
-	mi := &file_cmd_proto_snippetbox_proto_msgTypes[0]
+	mi := &file_snippetbox_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -45,7 +45,7 @@ func (x *Snippet) String() string {
 func (*Snippet) ProtoMessage() {}
 
 func (x *Snippet) ProtoReflect() protoreflect.Message {
-	mi := &file_cmd_proto_snippetbox_proto_msgTypes[0]
+	mi := &file_snippetbox_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -58,7 +58,7 @@ func (x *Snippet) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Snippet.ProtoReflect.Descriptor instead.
 func (*Snippet) Descriptor() ([]byte, []int) {
-	return file_cmd_proto_snippetbox_proto_rawDescGZIP(), []int{0}
+	return file_snippetbox_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *Snippet) GetId() int32 {
@@ -98,7 +98,7 @@ type GetSnippetRequest struct {
 
 func (x *GetSnippetRequest) Reset() {
 	*x = GetSnippetRequest{}
-	mi := &file_cmd_proto_snippetbox_proto_msgTypes[1]
+	mi := &file_snippetbox_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -110,7 +110,7 @@ func (x *GetSnippetRequest) String() string {
 func (*GetSnippetRequest) ProtoMessage() {}
 
 func (x *GetSnippetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_cmd_proto_snippetbox_proto_msgTypes[1]
+	mi := &file_snippetbox_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -123,7 +123,7 @@ func (x *GetSnippetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSnippetRequest.ProtoReflect.Descriptor instead.
 func (*GetSnippetRequest) Descriptor() ([]byte, []int) {
-	return file_cmd_proto_snippetbox_proto_rawDescGZIP(), []int{1}
+	return file_snippetbox_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *GetSnippetRequest) GetId() int32 {
@@ -142,7 +142,7 @@ type GetSnippetResponse struct {
 
 func (x *GetSnippetResponse) Reset() {
 	*x = GetSnippetResponse{}
-	mi := &file_cmd_proto_snippetbox_proto_msgTypes[2]
+	mi := &file_snippetbox_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -154,7 +154,7 @@ func (x *GetSnippetResponse) String() string {
 func (*GetSnippetResponse) ProtoMessage() {}
 
 func (x *GetSnippetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_cmd_proto_snippetbox_proto_msgTypes[2]
+	mi := &file_snippetbox_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -167,7 +167,7 @@ func (x *GetSnippetResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSnippetResponse.ProtoReflect.Descriptor instead.
 func (*GetSnippetResponse) Descriptor() ([]byte, []int) {
-	return file_cmd_proto_snippetbox_proto_rawDescGZIP(), []int{2}
+	return file_snippetbox_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *GetSnippetResponse) GetSnippet() *Snippet {
@@ -188,7 +188,7 @@ type CreateSnippetRequest struct {
 
 func (x *CreateSnippetRequest) Reset() {
 	*x = CreateSnippetRequest{}
-	mi := &file_cmd_proto_snippetbox_proto_msgTypes[3]
+	mi := &file_snippetbox_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -200,7 +200,7 @@ func (x *CreateSnippetRequest) String() string {
 func (*CreateSnippetRequest) ProtoMessage() {}
 
 func (x *CreateSnippetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_cmd_proto_snippetbox_proto_msgTypes[3]
+	mi := &file_snippetbox_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -213,7 +213,7 @@ func (x *CreateSnippetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateSnippetRequest.ProtoReflect.Descriptor instead.
 func (*CreateSnippetRequest) Descriptor() ([]byte, []int) {
-	return file_cmd_proto_snippetbox_proto_rawDescGZIP(), []int{3}
+	return file_snippetbox_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *CreateSnippetRequest) GetTitle() string {
@@ -246,7 +246,7 @@ type CreateSnippetResponse struct {
 
 func (x *CreateSnippetResponse) Reset() {
 	*x = CreateSnippetResponse{}
-	mi := &file_cmd_proto_snippetbox_proto_msgTypes[4]
+	mi := &file_snippetbox_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -258,7 +258,7 @@ func (x *CreateSnippetResponse) String() string {
 func (*CreateSnippetResponse) ProtoMessage() {}
 
 func (x *CreateSnippetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_cmd_proto_snippetbox_proto_msgTypes[4]
+	mi := &file_snippetbox_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -271,7 +271,7 @@ func (x *CreateSnippetResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateSnippetResponse.ProtoReflect.Descriptor instead.
 func (*CreateSnippetResponse) Descriptor() ([]byte, []int) {
-	return file_cmd_proto_snippetbox_proto_rawDescGZIP(), []int{4}
+	return file_snippetbox_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *CreateSnippetResponse) GetSnippet() *Snippet {
@@ -289,7 +289,7 @@ type HomeRequest struct {
 
 func (x *HomeRequest) Reset() {
 	*x = HomeRequest{}
-	mi := &file_cmd_proto_snippetbox_proto_msgTypes[5]
+	mi := &file_snippetbox_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -301,7 +301,7 @@ func (x *HomeRequest) String() string {
 func (*HomeRequest) ProtoMessage() {}
 
 func (x *HomeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_cmd_proto_snippetbox_proto_msgTypes[5]
+	mi := &file_snippetbox_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -314,7 +314,7 @@ func (x *HomeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HomeRequest.ProtoReflect.Descriptor instead.
 func (*HomeRequest) Descriptor() ([]byte, []int) {
-	return file_cmd_proto_snippetbox_proto_rawDescGZIP(), []int{5}
+	return file_snippetbox_proto_rawDescGZIP(), []int{5}
 }
 
 type HomeResponse struct {
@@ -326,7 +326,7 @@ type HomeResponse struct {
 
 func (x *HomeResponse) Reset() {
 	*x = HomeResponse{}
-	mi := &file_cmd_proto_snippetbox_proto_msgTypes[6]
+	mi := &file_snippetbox_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -338,7 +338,7 @@ func (x *HomeResponse) String() string {
 func (*HomeResponse) ProtoMessage() {}
 
 func (x *HomeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_cmd_proto_snippetbox_proto_msgTypes[6]
+	mi := &file_snippetbox_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -351,7 +351,7 @@ func (x *HomeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HomeResponse.ProtoReflect.Descriptor instead.
 func (*HomeResponse) Descriptor() ([]byte, []int) {
-	return file_cmd_proto_snippetbox_proto_rawDescGZIP(), []int{6}
+	return file_snippetbox_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *HomeResponse) GetMessage() string {
@@ -361,11 +361,11 @@ func (x *HomeResponse) GetMessage() string {
 	return ""
 }
 
-var File_cmd_proto_snippetbox_proto protoreflect.FileDescriptor
+var File_snippetbox_proto protoreflect.FileDescriptor
 
-const file_cmd_proto_snippetbox_proto_rawDesc = "" +
+const file_snippetbox_proto_rawDesc = "" +
 	"\n" +
-	"\x1acmd/proto/snippetbox.proto\x12\n" +
+	"\x10snippetbox.proto\x12\n" +
 	"snippetbox\"c\n" +
 	"\aSnippet\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x14\n" +
@@ -390,22 +390,22 @@ const file_cmd_proto_snippetbox_proto_rawDesc = "" +
 	"\x04Home\x12\x17.snippetbox.HomeRequest\x1a\x18.snippetbox.HomeResponse\x12K\n" +
 	"\n" +
 	"GetSnippet\x12\x1d.snippetbox.GetSnippetRequest\x1a\x1e.snippetbox.GetSnippetResponse\x12T\n" +
-	"\rCreateSnippet\x12 .snippetbox.CreateSnippetRequest\x1a!.snippetbox.CreateSnippetResponseB\x16Z\x14snippetbox/pkg/protob\x06proto3"
+	"\rCreateSnippet\x12 .snippetbox.CreateSnippetRequest\x1a!.snippetbox.CreateSnippetResponseB&Z$snippetbox.paulkarayan.com/cmd/protob\x06proto3"
 
 var (
-	file_cmd_proto_snippetbox_proto_rawDescOnce sync.Once
-	file_cmd_proto_snippetbox_proto_rawDescData []byte
+	file_snippetbox_proto_rawDescOnce sync.Once
+	file_snippetbox_proto_rawDescData []byte
 )
 
-func file_cmd_proto_snippetbox_proto_rawDescGZIP() []byte {
-	file_cmd_proto_snippetbox_proto_rawDescOnce.Do(func() {
-		file_cmd_proto_snippetbox_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_cmd_proto_snippetbox_proto_rawDesc), len(file_cmd_proto_snippetbox_proto_rawDesc)))
+func file_snippetbox_proto_rawDescGZIP() []byte {
+	file_snippetbox_proto_rawDescOnce.Do(func() {
+		file_snippetbox_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_snippetbox_proto_rawDesc), len(file_snippetbox_proto_rawDesc)))
 	})
-	return file_cmd_proto_snippetbox_proto_rawDescData
+	return file_snippetbox_proto_rawDescData
 }
 
-var file_cmd_proto_snippetbox_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
-var file_cmd_proto_snippetbox_proto_goTypes = []any{
+var file_snippetbox_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_snippetbox_proto_goTypes = []any{
 	(*Snippet)(nil),               // 0: snippetbox.Snippet
 	(*GetSnippetRequest)(nil),     // 1: snippetbox.GetSnippetRequest
 	(*GetSnippetResponse)(nil),    // 2: snippetbox.GetSnippetResponse
@@ -414,7 +414,7 @@ var file_cmd_proto_snippetbox_proto_goTypes = []any{
 	(*HomeRequest)(nil),           // 5: snippetbox.HomeRequest
 	(*HomeResponse)(nil),          // 6: snippetbox.HomeResponse
 }
-var file_cmd_proto_snippetbox_proto_depIdxs = []int32{
+var file_snippetbox_proto_depIdxs = []int32{
 	0, // 0: snippetbox.GetSnippetResponse.snippet:type_name -> snippetbox.Snippet
 	0, // 1: snippetbox.CreateSnippetResponse.snippet:type_name -> snippetbox.Snippet
 	5, // 2: snippetbox.SnippetBox.Home:input_type -> snippetbox.HomeRequest
@@ -430,26 +430,26 @@ var file_cmd_proto_snippetbox_proto_depIdxs = []int32{
 	0, // [0:2] is the sub-list for field type_name
 }
 
-func init() { file_cmd_proto_snippetbox_proto_init() }
-func file_cmd_proto_snippetbox_proto_init() {
-	if File_cmd_proto_snippetbox_proto != nil {
+func init() { file_snippetbox_proto_init() }
+func file_snippetbox_proto_init() {
+	if File_snippetbox_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_cmd_proto_snippetbox_proto_rawDesc), len(file_cmd_proto_snippetbox_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_snippetbox_proto_rawDesc), len(file_snippetbox_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_cmd_proto_snippetbox_proto_goTypes,
-		DependencyIndexes: file_cmd_proto_snippetbox_proto_depIdxs,
-		MessageInfos:      file_cmd_proto_snippetbox_proto_msgTypes,
+		GoTypes:           file_snippetbox_proto_goTypes,
+		DependencyIndexes: file_snippetbox_proto_depIdxs,
+		MessageInfos:      file_snippetbox_proto_msgTypes,
 	}.Build()
-	File_cmd_proto_snippetbox_proto = out.File
-	file_cmd_proto_snippetbox_proto_goTypes = nil
-	file_cmd_proto_snippetbox_proto_depIdxs = nil
+	File_snippetbox_proto = out.File
+	file_snippetbox_proto_goTypes = nil
+	file_snippetbox_proto_depIdxs = nil
 }

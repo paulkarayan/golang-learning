@@ -2,7 +2,7 @@ syntax = "proto3";
 
   package snippetbox;
 
-  option go_package = "snippetbox/pkg/proto";
+  option go_package = "snippetbox.paulkarayan.com/cmd/proto";
 
   message Snippet {
     int32 id = 1;

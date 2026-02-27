@@ -205,3 +205,8 @@ message HomeRequest {}  <--- this is empty because its a bare request
 protoc --go_out=. --go-grpc_out=. cmd/proto/snippetbox.proto
 
 uhh looks fine?
+
+go get google.golang.org/grpc/test/bufconn
+
+no relative imports?!?
+pb "snippetbox/cmd/proto"
