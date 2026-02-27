@@ -239,7 +239,7 @@ ok so ...
 
 https://github.com/grpc/grpc-go/blob/master/examples/features/encryption/mTLS/server/main.go#L69
 
-we gotta add Certifcates
+we gotta add Certifcates...
 
 
 -- Add streaming — e.g. a ListSnippets server-streaming RPC
