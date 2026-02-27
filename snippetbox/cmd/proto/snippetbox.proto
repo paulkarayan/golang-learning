@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+  package snippetbox;
+
+  option go_package = "snippetbox/pkg/proto";
+
+  message Snippet {
+    int32 id = 1;
+    string title = 2;
+    string content = 3;
+    int32 expires = 4;
+  }
+
+  message GetSnippetRequest {
+    int32 id = 1;
+  }
+
+  message GetSnippetResponse {
+    Snippet snippet = 1;
+  }
+
+  message CreateSnippetRequest {
+    string title = 1;
+    string content = 2;
+    int32 expires = 3;
+  }
+
+  message CreateSnippetResponse {
+    Snippet snippet = 1;
+  }
+
+  message HomeRequest {}
+
+  message HomeResponse {
+    string message = 1;
+  }
+
+  service SnippetBox {
+    rpc Home(HomeRequest) returns (HomeResponse);
+    rpc GetSnippet(GetSnippetRequest) returns (GetSnippetResponse);
+    rpc CreateSnippet(CreateSnippetRequest) returns (CreateSnippetResponse);
+  }

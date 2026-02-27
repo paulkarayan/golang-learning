@@ -180,3 +180,28 @@ openssl x509 -req -in client-admin.csr -CA ca-cert.pem -CAkey ca-key.pem -CAcrea
 openssl req -newkey rsa:2048 -new -nodes -keyout client-user-key.pem -out client-user.csr -subj "/CN=user"
 
 openssl x509 -req -in client-user.csr -CA ca-cert.pem -CAkey ca-key.pem -CAcreateserial -out client-user-cert.pem -days 3650
+
+
+--- grpc
+we should be able to do both
+  1. HTTP stays on :4000 as-is
+  2. gRPC runs on :4001 (or whatever)
+
+brew install protobuf
+go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+go get google.golang.org/grpc
+
+echo 'export PATH="$PATH:/Users/pk/go-wks/bin"' >> ~/.zshrc
+source ~/.zshrc
+
+protoc --version && protoc-gen-go --version && protoc-gen-go-grpc --version
+
+
+# writing the .proto
+
+message HomeRequest {}  <--- this is empty because its a bare request
+
+protoc --go_out=. --go-grpc_out=. cmd/proto/snippetbox.proto
+
+uhh looks fine?
