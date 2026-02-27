@@ -86,14 +86,30 @@ func (b *Broadcaster) run() {
 
 		case id := <-b.unsubscribeCh:
 			// close channel, delete from map
+			if ch, ok := subscribers[id]; ok {
+				close(ch)
+				delete(subscribers, id)
+			}
 
 		case data := <-b.sendCh:
 			// append to history
+			history = append(history, data)
 			// send to all subscribers
+			for _, ch := range subscribers {
+				select {
+				case ch <- data:
+				default:
+					// drop if channel is full. how do we wanna handle?
+				}
+			}
 
 		case <-b.closeCh:
 			// close all subscriber channels
-			// return (kills the goroutine)
+			for _, ch := range subscribers {
+				close(ch)
+			}
+			// return (kills the _monitor_ goroutine)
+			return
 		}
 	}
 }
