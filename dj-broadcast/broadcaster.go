@@ -47,15 +47,15 @@ func (b *Broadcaster) run() {
 			// reply via req.resp
 
 		case id := <-b.unsubscribeCh:
-			// close channel, delete from
+			// close channel, delete from map
 
 		case data := <-b.sendCh:
 			// append to history
 			// send to all subscribers
 
 		case <-b.closeCh:
-			// close all subscriber chann
-			// return (kills the goroutin
+			// close all subscriber channels
+			// return (kills the goroutine)
 		}
 	}
 }
