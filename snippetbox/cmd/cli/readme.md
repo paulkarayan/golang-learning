@@ -135,3 +135,36 @@ sbox view --id 1 --token hardcode
 Display a specific snippet with ID 1...
 
 --- let's do mtls
+
+gdi mkcert doesnt do client certs
+
+CA is here:
+/Users/pk/Library/Application Support/mkcert
+
+eh let's just use openssl
+
+cd cmd/tls
+
+# CA (signs both server and client certs)
+openssl req -newkey rsa:2048 -new -nodes -x509 -days 3650 \
+  -out ca-cert.pem -keyout ca-key.pem \
+  -subj "/CN=snippetbox-ca"
+
+# Server cert (signed by CA)
+openssl req -newkey rsa:2048 -new -nodes \
+  -keyout server-key.pem -out server.csr \
+  -subj "/CN=localhost"
+
+openssl x509 -req -in server.csr -CA ca-cert.pem -CAkey ca-key.pem \
+  -CAcreateserial -out server-cert.pem -days 3650
+
+# Client cert (signed by same CA)
+openssl req -newkey rsa:2048 -new -nodes \
+  -keyout client-key.pem -out client.csr \
+  -subj "/CN=sbox-cli"
+
+openssl x509 -req -in client.csr -CA ca-cert.pem -CAkey ca-key.pem \
+  -CAcreateserial -out client-cert.pem -days 3650
+
+
+-- let's add ability to differentiate two user types via cert

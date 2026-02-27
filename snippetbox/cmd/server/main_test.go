@@ -1,8 +1,12 @@
 package main
 
 import (
+	"crypto/tls"
+	"crypto/x509"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 )
@@ -131,5 +135,75 @@ func TestBearerAuthAllowsValidToken(t *testing.T) {
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+}
+
+func TestMTLSAcceptsValidClientCert(t *testing.T) {
+	caCert, _ := os.ReadFile("./tls/ca-cert.pem")
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCert)
+
+	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			cn := r.TLS.PeerCertificates[0].Subject.CommonName
+			w.Write([]byte("yo " + cn))
+	}))
+	ts.TLS = &tls.Config{
+			ClientCAs:  caCertPool,
+			ClientAuth: tls.RequireAndVerifyClientCert,
+	}
+	ts.StartTLS()
+	defer ts.Close()
+
+	// client WITH valid client cert
+	cert, _ := tls.LoadX509KeyPair("./tls/client-admin-cert.pem",
+"./tls/client-admin-key.pem")
+	client := &http.Client{
+			Transport: &http.Transport{
+					TLSClientConfig: &tls.Config{
+							RootCAs:      caCertPool,
+							Certificates: []tls.Certificate{cert},
+					},
+			},
+	}
+	resp, err := client.Get(ts.URL)
+	if err != nil {
+			t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if string(body) != "yo admin" {
+			t.Fatalf("expected 'yo admin', got %q", string(body))
+	}
+}
+
+// reject requests with no client cert
+func TestMTLSRejectsNoClientCert(t *testing.T) {
+	// load CA
+	caCert, _ := os.ReadFile("./tls/ca-cert.pem")
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCert)
+
+	// server that requires client certs
+	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok"))
+	}))
+	ts.TLS = &tls.Config{
+			ClientCAs:  caCertPool,
+			ClientAuth: tls.RequireAndVerifyClientCert,
+	}
+	ts.StartTLS()
+	defer ts.Close()
+
+	// client with NO client cert — should fail
+	client := &http.Client{
+			Transport: &http.Transport{
+					TLSClientConfig: &tls.Config{
+							RootCAs: caCertPool,
+					},
+			},
+	}
+	_, err := client.Get(ts.URL)
+	if err == nil {
+		t.Fatal("expected error, got none — server accepted request without client cert")
 	}
 }

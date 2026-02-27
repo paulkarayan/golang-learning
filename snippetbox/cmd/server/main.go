@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"flag"
 	"log/slog"
 	"net/http"
@@ -34,11 +35,18 @@ func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	mux := http.NewServeMux()
-	// just make it TLS 1.3
+
+	// load CA
+	caCert, _ := os.ReadFile("./tls/ca-cert.pem")
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCert)
+
+	// just TLS 1.3
 	tlsConfig := &tls.Config{
-		MinVersion: tls.VersionTLS13,
-		CurvePreferences: []tls.CurveID{tls.X25519,
-			tls.CurveP256},
+		MinVersion:       tls.VersionTLS13,
+		CurvePreferences: []tls.CurveID{tls.X25519, tls.CurveP256},
+		ClientCAs:        caCertPool,
+		ClientAuth:       tls.RequireAndVerifyClientCert,
 	}
 
 	srv := &http.Server{
@@ -57,6 +65,6 @@ func main() {
 
 	logger.Info("starting server on", "addr", *addr)
 
-	err := srv.ListenAndServeTLS("./cmd/tls/localhost.pem", "./cmd/tls/localhost-key.pem")
+	err := srv.ListenAndServeTLS("./cmd/tls/server-cert.pem", "./cmd/tls/server-key.pem")
 	logger.Error("handle error", "err", err)
 }
