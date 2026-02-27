@@ -23,23 +23,77 @@ func newServer() http.Handler {
 	return mux
 }
 
-// like snippetbox,
+// like snippetbox...
 func createStation(sm *StationManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// sm.Create(id)
+		id := r.URL.Query().Get("id")
+		if id == "" {
+			http.Error(w, "missing id", http.StatusBadRequest)
+			return
+		}
+		err := sm.Create(id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+		// remember Go returns a 200 unless we change it
+		w.WriteHeader(http.StatusCreated)
+		fmt.Fprintln(w, "station created:", id)
 	}
 }
 
 func deleteStation(sm *StationManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// sm.Stop(id)
+		id := r.URL.Query().Get("id")
+		if id == "" {
+			http.Error(w, "missing id", http.StatusBadRequest)
+			return
+		}
+		err := sm.Stop(id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+
+		fmt.Fprintln(w, "station deleted:", id)
 	}
 }
 
 // connect client to the broadcaster
 func subscribe(sm *StationManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// sm.Subscribe(id)
+		id := r.URL.Query().Get("id")
+		if id == "" {
+			http.Error(w, "missing id", http.StatusBadRequest)
+			return
+		}
+		b, ok := sm.Get(id)
+		if !ok {
+			http.Error(w, "station not found", http.StatusNotFound)
+			return
+		}
+		subID, ch := b.Subscribe()
+		defer b.Unsubscribe(subID)
+
+		// we have to push the data in the handler buffer to the client
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			http.Error(w, "streaming not supported", 500)
+			return
+		}
+
+		for {
+			select {
+			case msg, ok := <-ch:
+				if !ok {
+					return // station closed
+				}
+				w.Write(msg)
+				flusher.Flush()
+			case <-r.Context().Done():
+				return // client disconnected
+			}
+		}
 	}
 }
 
