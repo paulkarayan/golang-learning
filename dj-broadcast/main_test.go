@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -111,4 +112,72 @@ func TestListenNonexistent(t *testing.T) {
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", resp.StatusCode)
 	}
+}
+
+// tests the slow reader behavior happens
+func TestSlowReader(t *testing.T) {
+	b := NewBroadcaster()
+	defer b.Close()
+
+	_, ch := b.Subscribe()
+
+	// send more than the buffer size (10)
+	for i := 0; i < 15; i++ {
+		b.Send([]byte(fmt.Sprintf("msg %d", i)))
+	}
+
+	// should only get 10 (buffer size), rest (5) are dropped
+	count := 0
+	for {
+		select {
+		case _, ok := <-ch:
+			if !ok {
+				t.Fatal("channel closed unexpectedly")
+			}
+			count++
+		default:
+			// nothing left in buffer
+			goto done
+		}
+	}
+done:
+	if count != 10 {
+		t.Fatalf("expected 10 messages, got %d", count)
+	}
+}
+
+// we expect that slow readers will not slow everyone else down
+
+func TestSlowReaderDoesntBlockOthers(t *testing.T) {
+	b := NewBroadcaster()
+	defer b.Close()
+
+	_, slow := b.Subscribe()
+	_, fast := b.Subscribe()
+
+	// fill slow reader's buffer
+	for i := 0; i < 15; i++ {
+		b.Send([]byte(fmt.Sprintf("msg %d", i)))
+	}
+
+	// fast reader drains immediately — should get 10
+	count := 0
+	// weird... but ok.
+loop:
+	for {
+		select {
+		case <-fast:
+			count++
+		default:
+			break loop
+		}
+	}
+
+	if count != 10 {
+		t.Fatalf("fast reader expected 10, got %d", count)
+	}
+
+	// we wouldnt get to this point if slow reader blocked Send
+	// but we're just suppressing the unused var error
+	_ = slow
 }
