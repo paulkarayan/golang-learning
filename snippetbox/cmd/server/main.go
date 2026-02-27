@@ -7,20 +7,36 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 )
 
-func bearerAuthMiddleware(token string, next http.HandlerFunc) http.HandlerFunc {
+// func bearerAuthMiddleware(token string, next http.HandlerFunc) http.HandlerFunc {
+// 	return func(w http.ResponseWriter, r *http.Request) {
+// 		authHeader := r.Header.Get("Authorization")
+// 		if authHeader == "" {
+// 			http.Error(w, "authorization requied", http.StatusUnauthorized)
+// 			return
+// 		}
+// 		parts := strings.SplitN(authHeader, " ", 2)
+// 		if len(parts) != 2 || parts[0] != "Bearer" || parts[1] != token {
+// 			http.Error(w, "invalid token", http.StatusUnauthorized)
+// 			return
+// 		}
+// 		next(w, r)
+// 	}
+// }
+
+// for extracting role + ensuring client cert in place
+func requireRole(role string, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
-			http.Error(w, "authorization requied", http.StatusUnauthorized)
+		if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
+			http.Error(w, "no client cert", http.StatusUnauthorized)
 			return
 		}
-		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) != 2 || parts[0] != "Bearer" || parts[1] != token {
-			http.Error(w, "invalid token", http.StatusUnauthorized)
+		cn := r.TLS.PeerCertificates[0].Subject.CommonName
+		// admin also includes role of user... makes it easier to handle routes
+		if cn != role && cn != "admin" {
+			http.Error(w, "forbidden: requires "+role, http.StatusForbidden)
 			return
 		}
 		next(w, r)

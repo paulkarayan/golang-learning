@@ -167,4 +167,6 @@ openssl x509 -req -in client.csr -CA ca-cert.pem -CAkey ca-key.pem \
   -CAcreateserial -out client-cert.pem -days 3650
 
 
+i keep getting emails despite these being test certs so add to gitignore...
+
 -- let's add ability to differentiate two user types via cert
