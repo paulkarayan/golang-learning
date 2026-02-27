@@ -114,3 +114,48 @@ func TestCloseShutsDownAll(t *testing.T) {
 		t.Fatal("expected ch2 to be closed")
 	}
 }
+
+func TestStationManagerCreate(t *testing.T) {
+	sm := NewStationManager()
+	err := sm.Create("rock")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, ok := sm.Get("rock")
+	if !ok {
+		t.Fatal("expected station to exist")
+	}
+	if b == nil {
+		t.Fatal("expected broadcaster, got nil")
+	}
+}
+
+func TestStationManagerDuplicateCreate(t *testing.T) {
+	sm := NewStationManager()
+	sm.Create("rock")
+	err := sm.Create("rock")
+	if err == nil {
+		t.Fatal("expected error for duplicate station")
+	}
+}
+
+func TestStationManagerStop(t *testing.T) {
+	sm := NewStationManager()
+	sm.Create("rock")
+	err := sm.Stop("rock")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, ok := sm.Get("rock")
+	if ok {
+		t.Fatal("expected station to be gone")
+	}
+}
+
+func TestStationManagerGetNonexistent(t *testing.T) {
+	sm := NewStationManager()
+	_, ok := sm.Get("nope")
+	if ok {
+		t.Fatal("expected station to not exist")
+	}
+}
