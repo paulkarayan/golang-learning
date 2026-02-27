@@ -90,6 +90,7 @@ func (b *Broadcaster) run() {
 			}
 
 			// add to map and reply via req.resp
+			subscribers[id] = ch
 			req.resp <- subResponse{id: id, ch: ch}
 			fmt.Printf("subscribers: %v, history len: %d\n", subscribers, len(history))
 
