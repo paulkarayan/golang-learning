@@ -249,3 +249,52 @@ func TestMain(m *testing.M) {
 		goleak.IgnoreTopFunction("net/http.(*persistConn).writeLoop"),
 	)
 }
+
+func TestManyListeners(t *testing.T) {
+	b := NewBroadcaster()
+	defer b.Close()
+
+	numListeners := 1000
+	channels := make([]chan []byte, numListeners)
+
+	for i := 0; i < numListeners; i++ {
+		_, ch := b.Subscribe()
+		channels[i] = ch
+	}
+
+	b.Send([]byte("broadcast to all"))
+
+	for i, ch := range channels {
+		select {
+		case msg := <-ch:
+			if string(msg) != "broadcast to all" {
+				t.Fatalf("listener %d: expected 'broadcast to all', got %q", i, msg)
+			}
+		default:
+			t.Fatalf("listener %d: no message received", i)
+		}
+	}
+}
+
+func TestServerDropsMidStream(t *testing.T) {
+	b := NewBroadcaster()
+
+	_, ch := b.Subscribe()
+
+	b.Send([]byte("first"))
+
+	// server kills the station
+	b.Close()
+
+	// listener should see the first message
+	msg := <-ch
+	if string(msg) != "first" {
+		t.Fatalf("expected 'first', got %q", msg)
+	}
+
+	// next read should get closed channel
+	_, ok := <-ch
+	if ok {
+		t.Fatal("expected channel to be closed")
+	}
+}
