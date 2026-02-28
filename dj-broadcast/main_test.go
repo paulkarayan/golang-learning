@@ -265,13 +265,9 @@ func TestManyListeners(t *testing.T) {
 	b.Send([]byte("broadcast to all"))
 
 	for i, ch := range channels {
-		select {
-		case msg := <-ch:
-			if string(msg) != "broadcast to all" {
-				t.Fatalf("listener %d: expected 'broadcast to all', got %q", i, msg)
-			}
-		default:
-			t.Fatalf("listener %d: no message received", i)
+		msg := <-ch
+		if string(msg) != "broadcast to all" {
+			t.Fatalf("listener %d: expected 'broadcast to all', got %q", i, msg)
 		}
 	}
 }
