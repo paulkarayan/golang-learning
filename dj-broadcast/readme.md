@@ -178,3 +178,16 @@ broadcaster.go:70:2: field history is unused (unused)
 * gocritic: 1
 * unused: 1
 make: *** [lint] Error 1
+
+
+## after linting fixed
+  Semgrep findings:
+
+  1. unbounded-append-in-loop — real finding, history grows forever. Already in your stress test TODO.
+  2. channel-close-without-once — lines 122 and 141 in broadcaster.go. Line 122 is close(ch) inside Unsubscribe (single subscriber
+  channel), line 141 is close(ch) in the Close loop. Both are inside run() which is single-goroutine so double-close can't happen
+  there. But your stress test already proved the outer Close() method has a double-close problem. These are partially false positives
+  since the closes are inside the monitor goroutine.
+  3. use-tls — http.ListenAndServe without TLS. This is a dev server, suppress or upgrade later.
+  4. XSS on w.Write(msg) — line 93 writes raw broadcast bytes to the response. This is an audio/data stream, not an HTML page. False
+  positive for your use case. Suppress with // nosemgrep: go.net.xss.no-direct-write-to-responsewriter-taint.
