@@ -126,6 +126,10 @@ func (b *Broadcaster) run() {
 		case data := <-b.sendCh:
 			// append to history
 			history = append(history, data)
+			// add a ring buffer so this doesnt grow unbounded. thx semgrep!
+			if len(history) > 100 {
+				history = history[1:]
+			}
 			// send to all subscribers
 			for _, ch := range subscribers {
 				select {
