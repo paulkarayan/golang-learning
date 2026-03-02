@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
@@ -73,23 +74,36 @@ func TestListenGetsHistory(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	// we observed this test hanging. so we need to deal with
-	//  http.Get blocking until the server sends headers + starts the body
-
+	// read in a loop — a single Read() may not return both messages
+	// due to TCP buffering / timing
 	done := make(chan string)
 	go func() {
+		var acc []byte
 		buf := make([]byte, 1024)
-		n, _ := resp.Body.Read(buf)
-		done <- string(buf[:n])
+		for {
+			n, err := resp.Body.Read(buf)
+			acc = append(acc, buf[:n]...)
+			if bytes.Contains(acc, []byte("Time Bomb")) && bytes.Contains(acc, []byte("Ruby Soho")) {
+				done <- string(acc)
+				return
+			}
+			if err != nil {
+				done <- string(acc)
+				return
+			}
+		}
 	}()
 
-	body := <-done
-
-	if !strings.Contains(body, "Time Bomb") {
-		t.Fatalf("expected Time Bomb in history, got %q", body)
-	}
-	if !strings.Contains(body, "Ruby Soho") {
-		t.Fatalf("expected Ruby Soho in history, got %q", body)
+	select {
+	case body := <-done:
+		if !strings.Contains(body, "Time Bomb") {
+			t.Fatalf("expected Time Bomb in history, got %q", body)
+		}
+		if !strings.Contains(body, "Ruby Soho") {
+			t.Fatalf("expected Ruby Soho in history, got %q", body)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for history")
 	}
 }
 
