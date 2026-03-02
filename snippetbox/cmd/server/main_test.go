@@ -92,6 +92,7 @@ func TestServerTLS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
 	}
@@ -204,7 +205,8 @@ func TestMTLSRejectsNoClientCert(t *testing.T) {
 			},
 		},
 	}
-	_, err := client.Get(ts.URL)
+	// we want the response to have an error...
+	_, err := client.Get(ts.URL) //nolint:bodyclose
 	if err == nil {
 		t.Fatal("expected error, got none — server accepted request without client cert")
 	}

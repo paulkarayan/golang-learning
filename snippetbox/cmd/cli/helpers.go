@@ -25,16 +25,16 @@ func makeRequest(client *http.Client, method, url string, body io.Reader) (*http
 
 // verbose helper extracted from main.go
 func printResponse(resp *http.Response, verbose bool, stdout io.Writer) {
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 	body, _ := io.ReadAll(resp.Body)
 	if verbose {
-		fmt.Fprintln(stdout, "Status:", resp.Status)
+		fmt.Fprintln(stdout, "Status:", resp.Status) //nolint:errcheck
 		for k, v := range resp.Header {
-			fmt.Fprintf(stdout, "%s: %s\n", k, v)
+			fmt.Fprintf(stdout, "%s: %s\n", k, v) //nolint:errcheck
 		}
-		fmt.Fprintln(stdout, "---")
+		fmt.Fprintln(stdout, "---") //nolint:errcheck
 	}
-	fmt.Fprintln(stdout, string(body))
+	fmt.Fprintln(stdout, string(body)) //nolint:errcheck
 }
 
 // we are going to look up the correct cert and key for the role
