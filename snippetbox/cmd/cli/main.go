@@ -22,7 +22,7 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 
 	//no args
 	if len(args) < 1 {
-		fmt.Fprintln(stdout, "expected 'foo' or 'bar' subcommands")
+		fmt.Fprintln(stdout, "expected 'foo' or 'bar' subcommands") //nolint:errcheck
 		return 1
 	}
 
@@ -34,19 +34,19 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 		fooName := fooCmd.String("name", "", "name")
 
 		fooCmd.Parse(args[1:])
-		fmt.Fprintln(stdout, "subcommand 'foo'")
-		fmt.Fprintln(stdout, "  enable:", *fooEnable)
-		fmt.Fprintln(stdout, "  name:", *fooName)
-		fmt.Fprintln(stdout, "  tail:", fooCmd.Args())
+		fmt.Fprintln(stdout, "subcommand 'foo'")    //nolint:errcheck
+		fmt.Fprintln(stdout, "  enable:", *fooEnable) //nolint:errcheck
+		fmt.Fprintln(stdout, "  name:", *fooName)     //nolint:errcheck
+		fmt.Fprintln(stdout, "  tail:", fooCmd.Args()) //nolint:errcheck
 
 	case "bar":
 		barCmd := flag.NewFlagSet("bar", flag.ExitOnError)
 		barLevel := barCmd.Int("level", 0, "level")
 
 		barCmd.Parse(args[1:])
-		fmt.Fprintln(stdout, "subcommand 'bar'")
-		fmt.Fprintln(stdout, "  level:", *barLevel)
-		fmt.Fprintln(stdout, "  tail:", barCmd.Args())
+		fmt.Fprintln(stdout, "subcommand 'bar'")    //nolint:errcheck
+		fmt.Fprintln(stdout, "  level:", *barLevel)   //nolint:errcheck
+		fmt.Fprintln(stdout, "  tail:", barCmd.Args()) //nolint:errcheck
 
 	//  sbox home -v --role user
 	case "home":
@@ -63,14 +63,14 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 				var err error
 				client, err = clientForRole(*role, "./cmd/tls/ca-cert.pem", "./cmd/tls")
 				if err != nil {
-					fmt.Fprintln(stdout, "error:", err)
+					fmt.Fprintln(stdout, "error:", err) //nolint:errcheck
 					return 1
 				}
 			}
 
 			resp, err := makeRequest(client, "GET", *host+"/", nil)
 			if err != nil {
-				fmt.Fprintln(stdout, "error", err)
+				fmt.Fprintln(stdout, "error", err) //nolint:errcheck
 				return 1
 			}
 			printResponse(resp, *verbose, stdout)
@@ -78,19 +78,19 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 			// do your grpc thing
 			conn, err := grpcConnForRole(*role, "./cmd/tls/ca-cert.pem", "./cmd/tls", *grpcHost)
 			if err != nil {
-				fmt.Fprintln(stdout, "error:", err)
+				fmt.Fprintln(stdout, "error:", err) //nolint:errcheck
 				return 1
 			}
-			defer conn.Close()
+			defer conn.Close() //nolint:errcheck
 
 			c := pb.NewSnippetBoxClient(conn)
 			resp, err := c.Home(context.Background(), &pb.HomeRequest{})
 			if err != nil {
-				fmt.Fprintln(stdout, "error:", err)
+				fmt.Fprintln(stdout, "error:", err) //nolint:errcheck
 				return 1
 			}
 
-			fmt.Fprintln(stdout, resp.Message)
+			fmt.Fprintln(stdout, resp.Message) //nolint:errcheck
 		}
 
 	//  sbox view --id 1 --role admin
@@ -115,7 +115,7 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 			var err error
 			client, err = clientForRole(*role, "./cmd/tls/ca-cert.pem", "./cmd/tls")
 			if err != nil {
-				fmt.Fprintln(stdout, "error:", err)
+				fmt.Fprintln(stdout, "error:", err) //nolint:errcheck
 				return 1
 			}
 		}
@@ -124,7 +124,7 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 		resp, err := makeRequest(client, "GET",
 			fmt.Sprintf("%s/snippet/view/%d", *host, *id), nil)
 		if err != nil {
-			fmt.Fprintln(stdout, "error", err)
+			fmt.Fprintln(stdout, "error", err) //nolint:errcheck
 			return 1
 		}
 		printResponse(resp, *verbose, stdout)
@@ -144,7 +144,7 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 			var err error
 			client, err = clientForRole(*role, "./cmd/tls/ca-cert.pem", "./cmd/tls")
 			if err != nil {
-				fmt.Fprintln(stdout, "error:", err)
+				fmt.Fprintln(stdout, "error:", err) //nolint:errcheck
 				return 1
 			}
 		}
@@ -157,12 +157,12 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 
 		payload, err := json.Marshal(data)
 		if err != nil {
-			fmt.Fprintln(stdout, "error:", err)
+			fmt.Fprintln(stdout, "error:", err) //nolint:errcheck
 			return 1
 		}
 		resp, err := makeRequest(client, "POST", *host+"/snippet/create", bytes.NewReader(payload))
 		if err != nil {
-			fmt.Fprintln(stdout, "error", err)
+			fmt.Fprintln(stdout, "error", err) //nolint:errcheck
 			return 1
 		}
 
@@ -170,7 +170,7 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 
 	// wrong args
 	default:
-		fmt.Fprintln(stdout, "expected 'foo' or 'bar' or 'home' or 'view' or 'create' subcommands")
+		fmt.Fprintln(stdout, "expected 'foo' or 'bar' or 'home' or 'view' or 'create' subcommands") //nolint:errcheck
 		return 1
 	}
 	return 0
