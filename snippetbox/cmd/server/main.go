@@ -140,14 +140,15 @@ func main() {
 
 	// we have to do this in goroutine so we can run second server wo blocking
 	go func() {
-		lis, err := net.Listen("tcp", ":4001")
-		if err != nil {
-			logger.Error("grpc listen", "err", err)
+		// "err" caught by linter even though its scoped to the goroutine but ill fix nonetheless
+		lis, lisErr := net.Listen("tcp", ":4001")
+		if lisErr != nil {
+			logger.Error("grpc listen", "err", lisErr)
 			return
 		}
 		logger.Info("starting grpc server on", "addr", ":4001")
-		if err := grpcSrv.Serve(lis); err != nil {
-			logger.Error("grpc serve", "err", err)
+		if lisErr := grpcSrv.Serve(lis); lisErr != nil {
+			logger.Error("grpc serve", "err", lisErr)
 		}
 	}()
 
