@@ -1,10 +1,18 @@
-name: CI
+name: "dj-broadcast: CI"
 
 on:
   push:
     branches: [main]
+    paths:
+      - 'dj-broadcast/**'
   pull_request:
     branches: [main]
+    paths:
+      - 'dj-broadcast/**'
+
+defaults:
+  run:
+    working-directory: dj-broadcast
 
 jobs:
   static:
@@ -15,7 +23,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version-file: dj-broadcast/go.mod
 
       - name: gofmt check
         run: test -z "$(gofmt -l .)" || (echo "Files not formatted:"; gofmt -l .; exit 1)
@@ -27,15 +35,15 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         with:
           version: latest
+          working-directory: dj-broadcast
 
       - name: semgrep
         uses: returntocorp/semgrep-action@v1
         with:
           config: >
-            .semgrep.yml
+            dj-broadcast/.semgrep.yml
             p/golang
             p/trailofbits
-        if: hashFiles('.semgrep.yml') != ''
 
   gcatch:
     name: GCatch Concurrency Analysis
@@ -45,7 +53,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version-file: dj-broadcast/go.mod
 
       - name: Install Z3
         run: sudo apt-get update && sudo apt-get install -y libz3-dev z3
@@ -83,7 +91,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version-file: dj-broadcast/go.mod
 
       - name: Tests with race detector
         run: go test -race -count=10 ./...

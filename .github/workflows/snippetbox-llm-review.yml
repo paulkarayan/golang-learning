@@ -1,9 +1,9 @@
-name: LLM Concurrency Review
+name: "snippetbox: LLM Concurrency Review"
 
 on:
   pull_request:
     paths:
-      - '**.go'
+      - 'snippetbox/**.go'
 
 jobs:
   concurrency-review:
@@ -19,7 +19,7 @@ jobs:
       - name: Get changed Go files
         id: changed
         run: |
-          FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} -- '*.go' | tr '\n' ' ')
+          FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} -- 'snippetbox/**/*.go' | tr '\n' ' ')
           echo "files=$FILES" >> $GITHUB_OUTPUT
           if [ -z "$FILES" ]; then
             echo "skip=true" >> $GITHUB_OUTPUT

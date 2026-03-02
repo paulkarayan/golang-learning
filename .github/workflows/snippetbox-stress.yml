@@ -1,9 +1,13 @@
-name: Stress Tests
+name: "snippetbox: Stress Tests"
 
 on:
   schedule:
     - cron: '0 * * * *' # every hour
   workflow_dispatch: # manual trigger
+
+defaults:
+  run:
+    working-directory: snippetbox
 
 jobs:
   stress:
@@ -14,7 +18,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version-file: snippetbox/go.mod
 
       - name: Stress tests with race detector
         run: go test -tags=stress -race -count=100 -timeout=15m ./...
