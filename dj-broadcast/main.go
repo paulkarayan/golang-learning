@@ -40,7 +40,7 @@ func createStation(sm *StationManager) http.HandlerFunc {
 		}
 		// remember Go returns a 200 unless we change it
 		w.WriteHeader(http.StatusCreated)
-		fmt.Fprintln(w, "station created:", id)
+		fmt.Fprintln(w, "station created:", id) //nolint:errcheck
 	}
 }
 
@@ -57,7 +57,7 @@ func deleteStation(sm *StationManager) http.HandlerFunc {
 			return
 		}
 
-		fmt.Fprintln(w, "station deleted:", id)
+		fmt.Fprintln(w, "station deleted:", id) //nolint:errcheck
 	}
 }
 

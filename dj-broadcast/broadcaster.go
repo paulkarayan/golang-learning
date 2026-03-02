@@ -65,9 +65,6 @@ type Broadcaster struct {
 	unsubscribeCh chan int
 	sendCh        chan []byte
 	closeCh       chan struct{}
-	// claude points out that this should be in run() because other goroutines could
-	// access it here. but they wont, and i have agency. lol
-	history [][]byte
 }
 
 type subRequest struct {

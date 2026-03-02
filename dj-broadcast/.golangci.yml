@@ -16,6 +16,13 @@ linters:
       enable:
         - copylocks
         - shadow
+    errcheck:
+      exclude-functions:
+        - fmt.Fprintln
+        - fmt.Fprintf
+        - fmt.Fprint
+        - (net/http.ResponseWriter).Write
+        - (*net/http.response).Write
     gocritic:
       enabled-checks:
         - sloppyReassign
