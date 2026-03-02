@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -12,8 +13,8 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
-func makeRequest(client *http.Client, method, url string, body io.Reader) (*http.Response, error) {
-	req, err := http.NewRequest(method, url, body)
+func makeRequest(ctx context.Context, client *http.Client, method, url string, body io.Reader) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
 		return nil, err
 	}

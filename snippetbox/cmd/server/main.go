@@ -141,7 +141,8 @@ func main() {
 	// we have to do this in goroutine so we can run second server wo blocking
 	go func() {
 		// "err" caught by linter even though its scoped to the goroutine but ill fix nonetheless
-		lis, lisErr := net.Listen("tcp", ":4001")
+		lc := net.ListenConfig{}
+		lis, lisErr := lc.Listen(context.Background(), "tcp", ":4001")
 		if lisErr != nil {
 			logger.Error("grpc listen", "err", lisErr)
 			return

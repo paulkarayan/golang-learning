@@ -70,7 +70,7 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 				}
 			}
 
-			resp, err := makeRequest(client, "GET", *host+"/", nil)
+			resp, err := makeRequest(context.Background(), client, "GET", *host+"/", nil)
 			if err != nil {
 				fmt.Fprintln(stdout, "error", err) //nolint:errcheck
 				return 1
@@ -123,7 +123,7 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 		}
 
 		// remember id = 0 is default and will 404
-		resp, err := makeRequest(client, "GET",
+		resp, err := makeRequest(context.Background(), client, "GET",
 			fmt.Sprintf("%s/snippet/view/%d", *host, *id), nil)
 		if err != nil {
 			fmt.Fprintln(stdout, "error", err) //nolint:errcheck
@@ -162,7 +162,7 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 			fmt.Fprintln(stdout, "error:", err) //nolint:errcheck
 			return 1
 		}
-		resp, err := makeRequest(client, "POST", *host+"/snippet/create", bytes.NewReader(payload))
+		resp, err := makeRequest(context.Background(), client, "POST", *host+"/snippet/create", bytes.NewReader(payload))
 		if err != nil {
 			fmt.Fprintln(stdout, "error", err) //nolint:errcheck
 			return 1
