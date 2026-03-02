@@ -20,7 +20,7 @@ func main() {
 
 func run(args []string, stdout io.Writer, client *http.Client) int {
 
-	//no args
+	// no args
 	if len(args) < 1 {
 		fmt.Fprintln(stdout, "expected 'foo' or 'bar' subcommands") //nolint:errcheck
 		return 1
@@ -105,7 +105,7 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 
 		viewCmd.Parse(args[1:]) //nolint:errcheck
 
-		//The flag methods (String, Int, Bool) return pointers
+		// The flag methods (String, Int, Bool) return pointers
 		//   because the values don't exist yet at declaration time —
 		//   they get filled in when Parse runs. The pointer gives
 		//  you a reference to where the value will be once parsing

@@ -9,7 +9,7 @@ import (
 
 func home(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Server", "Go")
-	w.Write([]byte("Hello from Snippetbox"))
+	w.Write([]byte("Hello from Snippetbox")) //nolint:errcheck
 }
 
 func snippetView(w http.ResponseWriter, r *http.Request) {
@@ -19,11 +19,11 @@ func snippetView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Fprintf(w, "Display a specific snippet with ID %d...", id)
+	fmt.Fprintf(w, "Display a specific snippet with ID %d...", id) //nolint:errcheck
 }
 
 func snippetCreate(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Display a form for creating a new snippet..."))
+	w.Write([]byte("Display a form for creating a new snippet...")) //nolint:errcheck
 }
 
 func snippetCreatePost(w http.ResponseWriter, r *http.Request) {
@@ -41,6 +41,6 @@ func snippetCreatePost(w http.ResponseWriter, r *http.Request) {
 	// note: i had a bug here - the first write implicity sent at 200 status. i caught in tests!
 	// fmt.Fprintf(w, ...) writes bytes to w, which is the http.ResponseWriter.   gdi
 	w.WriteHeader(http.StatusCreated)
-	fmt.Fprintf(w, "Title: %s\nContent: %s\nExpires: %d\n", input.Title, input.Content, input.Expires)
+	fmt.Fprintf(w, "Title: %s\nContent: %s\nExpires: %d\n", input.Title, input.Content, input.Expires) //nolint:errcheck
 	// w.WriteHeader(http.StatusCreated)
 }
