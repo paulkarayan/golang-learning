@@ -33,19 +33,21 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 		fooEnable := fooCmd.Bool("enable", false, "enable")
 		fooName := fooCmd.String("name", "", "name")
 
-		fooCmd.Parse(args[1:])
-		fmt.Fprintln(stdout, "subcommand 'foo'")    //nolint:errcheck
-		fmt.Fprintln(stdout, "  enable:", *fooEnable) //nolint:errcheck
-		fmt.Fprintln(stdout, "  name:", *fooName)     //nolint:errcheck
+		// I use ExitOnError, so the error return from Parse() is unreachable
+		fooCmd.Parse(args[1:])                         //nolint:errcheck
+		fmt.Fprintln(stdout, "subcommand 'foo'")       //nolint:errcheck
+		fmt.Fprintln(stdout, "  enable:", *fooEnable)  //nolint:errcheck
+		fmt.Fprintln(stdout, "  name:", *fooName)      //nolint:errcheck
 		fmt.Fprintln(stdout, "  tail:", fooCmd.Args()) //nolint:errcheck
 
 	case "bar":
 		barCmd := flag.NewFlagSet("bar", flag.ExitOnError)
 		barLevel := barCmd.Int("level", 0, "level")
 
-		barCmd.Parse(args[1:])
-		fmt.Fprintln(stdout, "subcommand 'bar'")    //nolint:errcheck
-		fmt.Fprintln(stdout, "  level:", *barLevel)   //nolint:errcheck
+		// I use ExitOnError, so the error return from Parse() is unreachable
+		barCmd.Parse(args[1:])                         //nolint:errcheck
+		fmt.Fprintln(stdout, "subcommand 'bar'")       //nolint:errcheck
+		fmt.Fprintln(stdout, "  level:", *barLevel)    //nolint:errcheck
 		fmt.Fprintln(stdout, "  tail:", barCmd.Args()) //nolint:errcheck
 
 	//  sbox home -v --role user
@@ -56,7 +58,7 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 		role := homeCmd.String("role", "user", "user or admin")
 		verbose := homeCmd.Bool("v", false, "verbose output")
 		useHTTP := homeCmd.Bool("http", false, "use HTTP instead of gRPC")
-		homeCmd.Parse(args[1:])
+		homeCmd.Parse(args[1:]) //nolint:errcheck
 
 		if *useHTTP {
 			if client == nil {
@@ -101,7 +103,7 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 		role := viewCmd.String("role", "user", "user or admin")
 		verbose := viewCmd.Bool("v", false, "verbose output")
 
-		viewCmd.Parse(args[1:])
+		viewCmd.Parse(args[1:]) //nolint:errcheck
 
 		//The flag methods (String, Int, Bool) return pointers
 		//   because the values don't exist yet at declaration time —
@@ -138,7 +140,7 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 		role := createCmd.String("role", "admin", "user or admin")
 		verbose := createCmd.Bool("v", false, "verbose output")
 
-		createCmd.Parse(args[1:])
+		createCmd.Parse(args[1:]) //nolint:errcheck
 
 		if client == nil {
 			var err error
