@@ -146,7 +146,7 @@ func (b *Broadcaster) run() {
 	}
 }
 
-func (b *Broadcaster) Subscribe() (int, chan []byte) {
+func (b *Broadcaster) Subscribe() (id int, ch chan []byte) {
 	// send subRequest, wait for response
 	req := subRequest{resp: make(chan subResponse)}
 	b.subscribeCh <- req
