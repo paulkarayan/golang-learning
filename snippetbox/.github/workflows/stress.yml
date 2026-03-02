@@ -1,0 +1,22 @@
+name: Stress Tests
+
+on:
+  schedule:
+    - cron: '0 * * * *' # every hour
+  workflow_dispatch: # manual trigger
+
+jobs:
+  stress:
+    name: Stress + Race (count=100)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Stress tests with race detector
+        run: go test -tags=stress -race -count=100 -timeout=15m ./...
+        env:
+          GOMAXPROCS: 4

@@ -1,0 +1,61 @@
+rules:
+  - id: fire-and-forget-goroutine
+    patterns:
+      - pattern: |
+          go func() {
+            ...
+          }()
+    message: >
+      Goroutine launched without error propagation or coordination.
+      Consider using errgroup or passing errors via channel.
+    languages: [go]
+    severity: WARNING
+
+  - id: channel-close-without-once
+    patterns:
+      - pattern: close($CHAN)
+      - pattern-not-inside: |
+          $ONCE.Do(func() {
+            ...
+          })
+    message: >
+      Closing a channel outside sync.Once risks double-close panic.
+      Wrap in sync.Once.Do() for safety.
+    languages: [go]
+    severity: WARNING
+
+  - id: sleep-based-synchronization
+    pattern: time.Sleep(...)
+    paths:
+      include:
+        - "*_test.go"
+    message: >
+      Using time.Sleep for synchronization in tests is flaky.
+      Use channels, sync.WaitGroup, or condition variables instead.
+    languages: [go]
+    severity: WARNING
+
+  - id: missing-signal-handler-http
+    patterns:
+      - pattern: http.ListenAndServe(...)
+      - pattern-not-inside: |
+          ...
+          signal.Notify(...)
+          ...
+    message: >
+      Starting HTTP server without signal handling prevents graceful shutdown.
+      Use signal.NotifyContext or signal.Notify.
+    languages: [go]
+    severity: WARNING
+
+  - id: missing-signal-handler-grpc
+    patterns:
+      - pattern: $SERVER.Serve(...)
+      - pattern-not-inside: |
+          ...
+          signal.Notify(...)
+          ...
+    message: >
+      Starting gRPC server without signal handling prevents graceful shutdown.
+    languages: [go]
+    severity: WARNING

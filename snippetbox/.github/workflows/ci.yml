@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  static:
+    name: Static Analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: gofmt check
+        run: test -z "$(gofmt -l .)" || (echo "Files not formatted:"; gofmt -l .; exit 1)
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+
+      - name: semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >
+            .semgrep.yml
+            p/golang
+            p/trailofbits
+        if: hashFiles('.semgrep.yml') != ''
+
+  gcatch:
+    name: GCatch Concurrency Analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install Z3
+        run: sudo apt-get update && sudo apt-get install -y libz3-dev z3
+
+      - name: Install GCatch
+        run: |
+          export GOPATH=$HOME/go
+          mkdir -p $GOPATH/src/github.com/system-pclub
+          git clone https://github.com/system-pclub/GCatch.git $GOPATH/src/github.com/system-pclub/GCatch
+          cd $GOPATH/src/github.com/system-pclub/GCatch/GCatch/cmd/GCatch
+          GO111MODULE=off go install
+          echo "$GOPATH/bin" >> $GITHUB_PATH
+
+      - name: Copy project into GOPATH
+        run: |
+          export GOPATH=$HOME/go
+          mkdir -p $GOPATH/src/snippetbox.paulkarayan.com
+          cp -r . $GOPATH/src/snippetbox.paulkarayan.com/
+
+      - name: Run GCatch
+        run: |
+          export GOPATH=$HOME/go
+          GO111MODULE=off $GOPATH/bin/GCatch \
+            -path=$GOPATH/src/snippetbox.paulkarayan.com \
+            -include=snippetbox.paulkarayan.com \
+            -checker=BMOC \
+            -r
+        continue-on-error: true
+
+  race:
+    name: Race Detector
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Tests with race detector
+        run: go test -race -count=10 ./...
+        env:
+          GOMAXPROCS: 4

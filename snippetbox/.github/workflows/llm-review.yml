@@ -1,0 +1,72 @@
+name: LLM Concurrency Review
+
+on:
+  pull_request:
+    paths:
+      - '**.go'
+
+jobs:
+  concurrency-review:
+    name: LLM Concurrency Review
+    runs-on: ubuntu-24.04
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed Go files
+        id: changed
+        run: |
+          FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} -- '*.go' | tr '\n' ' ')
+          echo "files=$FILES" >> $GITHUB_OUTPUT
+          if [ -z "$FILES" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Pass 1 — Checklist review
+        if: steps.changed.outputs.skip == 'false'
+        uses: anthropics/anthropic-ai-action@v1
+        with:
+          model: claude-sonnet-4-20250514
+          prompt: |
+            You are reviewing Go code for concurrency bugs. Our core directive:
+            "Avoid concurrency and networking errors. Most of the issues we've seen in production are related to data races, networking error handling or goroutine leaks."
+
+            Review the following changed files against this checklist:
+            - Are HTTP handler functions thread-safe?
+            - Are global functions and variables protected by mutexes or otherwise thread-safe?
+            - Are reads of fields and variables protected?
+            - Are loop variables passed into goroutine functions as arguments?
+            - Do methods on thread-safe types return pointers to protected structures? (they shouldn't)
+            - Are sync.Map Load/Store/Delete sequences race-free?
+            - Are channels intentionally created with zero vs buffered capacity?
+            - Are time.Ticker instances stopped with defer tick.Stop()?
+
+            Changed files: ${{ steps.changed.outputs.files }}
+
+            For each file, read it and report ONLY actual violations. No false positives. Be terse.
+          files: ${{ steps.changed.outputs.files }}
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      - name: Pass 2 — Per-file race analysis
+        if: steps.changed.outputs.skip == 'false'
+        uses: anthropics/anthropic-ai-action@v1
+        with:
+          model: claude-sonnet-4-20250514
+          prompt: |
+            You are a Go concurrency expert. For each file below, independently analyze (no shared context between files):
+
+            1. Data races and TOCTOU patterns (check-then-act across unlock boundaries)
+            2. Missing or incorrect networking error handling (unchecked errors on Close, Read, Write, Dial)
+            3. Goroutine leaks (fire-and-forget goroutines, blocked channel sends/receives, missing cleanup)
+            4. Patterns that won't be caught by golangci-lint or go test -race
+
+            Report ONLY real issues. Be terse. If a file has no issues, say so in one line.
+          files: ${{ steps.changed.outputs.files }}
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
