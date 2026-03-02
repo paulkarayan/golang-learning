@@ -67,7 +67,7 @@ func TestListenGetsHistory(t *testing.T) {
 		strings.NewReader("Now playing: Ruby Soho"))
 	r3.Body.Close()
 
-	resp, err := http.Get(srv.URL + "/station/listen?id=punk")
+	resp, err := http.Get(srv.URL + "/station/listen?id=punk") //nolint:bodyclose
 	if err != nil {
 		t.Fatal(err)
 	}

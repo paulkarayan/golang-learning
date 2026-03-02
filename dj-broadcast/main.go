@@ -3,13 +3,14 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 )
 
 func main() {
 	srv := newServer()
 	fmt.Println("listening on :8080")
-	http.ListenAndServe(":8080", srv)
+	log.Fatal(http.ListenAndServe(":8080", srv))
 }
 
 func newServer() http.Handler {
