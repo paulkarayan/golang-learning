@@ -1,0 +1,53 @@
+rules:
+  - id: fire-and-forget-goroutine
+    patterns:
+      - pattern: |
+          go func() {
+            ...
+          }()
+    message: >
+      Goroutine launched without error propagation or coordination.
+      Consider using errgroup or passing errors via channel.
+    languages: [go]
+    severity: WARNING
+
+  - id: channel-close-without-once
+    patterns:
+      - pattern: close($CHAN)
+      - pattern-not-inside: |
+          $ONCE.Do(func() {
+            ...
+          })
+    message: >
+      Closing a channel outside sync.Once risks double-close panic.
+      Wrap in sync.Once.Do() for safety.
+    languages: [go]
+    severity: WARNING
+
+  - id: sleep-based-synchronization
+    pattern: time.Sleep(...)
+    paths:
+      include:
+        - "*_test.go"
+    message: >
+      Using time.Sleep for synchronization in tests is flaky.
+      Use channels, sync.WaitGroup, or condition variables instead.
+    languages: [go]
+    severity: WARNING
+
+  - id: unbounded-append-in-loop
+    patterns:
+      - pattern: |
+          for ... {
+            ...
+            $X = append($X, ...)
+            ...
+          }
+      - pattern-not-inside: |
+          if len($X) > $LIMIT {
+            ...
+          }
+    message: >
+      Appending in a loop without bounds checking may cause unbounded memory growth.
+    languages: [go]
+    severity: INFO

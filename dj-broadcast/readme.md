@@ -104,3 +104,77 @@ go test -v -run TestCleanupOnDisconnect -timeout 10s 2>&1
 // fails here:
 dj-broadcast.TestCleanupOnDisconnect(0x14000100700)
         /Users/pk/golang-learning/dj-broadcast/main_test.go:193 +0xd4
+
+
+# goleaks
+we find leaks in the tests but not the app. what to do?
+
+
+# adding a pantload of CI/CD esp. to spot issues i've missed
+
+## local
+brew install golangci-lint
+brew install semgrep
+
+```
+make setup-hooks
+make ci
+# runs: fmt-check → vet → lint → semgrep → race (count=10)
+
+# run individual pieces
+make test          # plain go test
+make race          # go test -race -count=10
+make lint          # golangci-lint
+make semgrep       # custom rules + p/golang + p/trailofbits
+make gcatch        # GCatch (needs Z3 + GCatch installed locally)
+
+# run stress tests (slow — this is the count=100 suite)
+make stress
+
+# run everything
+  make ci-full       # ci + stress
+```
+
+
+
+
+# behind the filtering of ~/golang-learning/snippetbox/cmd/server/testmain_test.go
+
+https://github.com/uber-go/goleak/discussions/89
+
+https://github.com/uber-go/goleak/blob/2b7fd8a0d244fa0d8b5857330fd1cefce940fa53/options.go#L65
+
+
+
+# looking at errors
+
+make ci                                                                                             ()
+go vet ./...
+golangci-lint run ./...
+main_test.go:70:23: response body must be closed (bodyclose)
+        resp, err := http.Get(srv.URL + "/station/listen?id=punk")
+                             ^
+main.go:12:21: Error return value of `http.ListenAndServe` is not checked (errcheck)
+        http.ListenAndServe(":8080", srv)
+                           ^
+main.go:42:15: Error return value of `fmt.Fprintln` is not checked (errcheck)
+                fmt.Fprintln(w, "station created:", id)
+                            ^
+main.go:59:15: Error return value of `fmt.Fprintln` is not checked (errcheck)
+                fmt.Fprintln(w, "station deleted:", id)
+                            ^
+main.go:92:12: Error return value of `w.Write` is not checked (errcheck)
+                                w.Write(msg)
+                                       ^
+broadcaster.go:152:1: unnamedResult: consider giving a name to these results (gocritic)
+func (b *Broadcaster) Subscribe() (int, chan []byte) {
+^
+broadcaster.go:70:2: field history is unused (unused)
+        history [][]byte
+        ^
+7 issues:
+* bodyclose: 1
+* errcheck: 4
+* gocritic: 1
+* unused: 1
+make: *** [lint] Error 1
