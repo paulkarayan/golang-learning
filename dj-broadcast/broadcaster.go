@@ -119,7 +119,8 @@ func (b *Broadcaster) run() {
 		case id := <-b.unsubscribeCh:
 			// close channel, delete from map
 			if ch, ok := subscribers[id]; ok {
-				close(ch)
+				// we can't double close because monitor pattern, so suppress
+				close(ch) // nosemgrep: channel-close-without-once
 				delete(subscribers, id)
 			}
 
@@ -143,7 +144,8 @@ func (b *Broadcaster) run() {
 		case <-b.closeCh:
 			// close all subscriber channels
 			for _, ch := range subscribers {
-				close(ch)
+				// we cant double close bc monitor pattern, so suppress semgrep
+				close(ch) // nosemgrep: channel-close-without-once
 			}
 			// return (kills the _monitor_ goroutine)
 			return
