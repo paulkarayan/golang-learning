@@ -35,8 +35,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
-          version: v2.1.6
-          install-mode: goinstall
+          version: v2.10.1
           working-directory: dj-broadcast
 
       - name: semgrep
@@ -64,17 +63,18 @@ jobs:
       - name: Install GCatch
         run: |
           export GOPATH=$HOME/go
+          MODCACHE=$(go env GOMODCACHE)
           mkdir -p $GOPATH/src/github.com/system-pclub
           git clone https://github.com/system-pclub/GCatch.git $GOPATH/src/github.com/system-pclub/GCatch
-          # fetch GOPATH-mode dependencies GCatch needs
-          go get golang.org/x/xerrors
-          go get golang.org/x/mod/semver
-          go get golang.org/x/sys/execabs
-          # copy them into GOPATH/src for GO111MODULE=off
-          cp -r $(go env GOMODCACHE)/golang.org/x/xerrors@*/. $GOPATH/src/golang.org/x/xerrors/ 2>/dev/null || true
-          cp -r $(go env GOMODCACHE)/golang.org/x/mod@*/. $GOPATH/src/golang.org/x/mod/ 2>/dev/null || true
-          cp -r $(go env GOMODCACHE)/golang.org/x/sys@*/. $GOPATH/src/golang.org/x/sys/ 2>/dev/null || true
-          cp -r $(go env GOMODCACHE)/golang.org/x/tools@*/. $GOPATH/src/golang.org/x/tools/ 2>/dev/null || true
+          # fetch dependencies GCatch needs and copy into GOPATH/src for GO111MODULE=off
+          go get golang.org/x/xerrors golang.org/x/mod golang.org/x/sys golang.org/x/tools
+          for pkg in xerrors mod sys tools; do
+            SRC=$(find "$MODCACHE/golang.org/x" -maxdepth 1 -name "${pkg}@*" -type d | head -1)
+            if [ -n "$SRC" ]; then
+              mkdir -p "$GOPATH/src/golang.org/x/$pkg"
+              cp -r "$SRC"/. "$GOPATH/src/golang.org/x/$pkg/"
+            fi
+          done
           cd $GOPATH/src/github.com/system-pclub/GCatch/GCatch/cmd/GCatch
           GO111MODULE=off go install
           echo "$GOPATH/bin" >> $GITHUB_PATH

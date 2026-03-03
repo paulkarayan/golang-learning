@@ -84,7 +84,7 @@ func NewBroadcaster() *Broadcaster {
 		subscribeCh:   make(chan subRequest),
 		unsubscribeCh: make(chan int),
 		sendCh:        make(chan []byte),
-		closeCh:       make(chan struct{}),
+		closeCh:       make(chan struct{}, 1), //lets avoid the double close problem. make this a non-blocking send
 	}
 	// go b.run() — start the monitor goroutine, which runs until Close
 	go b.run()
@@ -171,6 +171,10 @@ func (b *Broadcaster) Send(data []byte) {
 
 func (b *Broadcaster) Close() {
 	// send to closeCh
-	// apparently this is a convention for signal only channel as 0 byte
-	b.closeCh <- struct{}{}
+	// use the buffered channel of size 1, non-blocking send
+	// "signal at most once" channels
+	select {
+	case b.closeCh <- struct{}{}: // apparently this is a convention for signal only channel as 0 byte
+	default:
+	}
 }
