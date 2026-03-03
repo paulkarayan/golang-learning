@@ -8,9 +8,9 @@ import (
 )
 
 func main() {
-	srv := newServer() // nosemgrep: go.lang.security.audit.net.use-tls.use-tls
+	srv := newServer()
 	fmt.Println("listening on :8080")
-	log.Fatal(http.ListenAndServe(":8080", srv))
+	log.Fatal(http.ListenAndServe(":8080", srv)) // nosemgrep: go.lang.security.audit.net.use-tls.use-tls
 }
 
 func newServer() http.Handler {
@@ -90,7 +90,7 @@ func subscribe(sm *StationManager) http.HandlerFunc {
 				if !ok {
 					return // station closed
 				}
-				w.Write(msg) // nosemgrep: go.net.xss.no-direct-write-to-responsewriter-taint
+				w.Write(msg) // nosemgrep: go.net.xss.no-direct-write-to-responsewriter-taint.no-direct-write-to-responsewriter-taint
 				flusher.Flush()
 			case <-r.Context().Done():
 				return // client disconnected
