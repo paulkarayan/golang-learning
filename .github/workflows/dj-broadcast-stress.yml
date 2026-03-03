@@ -19,6 +19,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: dj-broadcast/go.mod
+          cache-dependency-path: dj-broadcast/go.sum
 
       - name: Stress tests with race detector
         run: go test -tags=stress -race -count=100 -timeout=15m ./...

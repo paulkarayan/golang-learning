@@ -125,7 +125,8 @@ func (b *Broadcaster) run() {
 
 		case data := <-b.sendCh:
 			// append to history
-			history = append(history, data)
+			// note that the ring buffer below handles the case but semgrep still spots it, so suppress
+			history = append(history, data) // nosemgrep: unbounded-append-in-loop
 			// add a ring buffer so this doesnt grow unbounded. thx semgrep!
 			if len(history) > 100 {
 				history = history[1:]
