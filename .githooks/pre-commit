@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -e
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
+PROJECTS=("dj-broadcast" "snippetbox")
+
+# find which projects have staged changes
+CHANGED=()
+for proj in "${PROJECTS[@]}"; do
+    if git diff --cached --name-only | grep -q "^${proj}/"; then
+        CHANGED+=("$proj")
+    fi
+done
+
+if [ ${#CHANGED[@]} -eq 0 ]; then
+    echo "==> No Go project changes staged, skipping checks."
+    exit 0
+fi
+
+for proj in "${CHANGED[@]}"; do
+    echo ""
+    echo "==> [$proj] Running pre-commit checks..."
+    cd "$REPO_ROOT/$proj"
+
+    echo "==> [$proj] gofmt"
+    UNFORMATTED=$(gofmt -l .)
+    if [ -n "$UNFORMATTED" ]; then
+        echo "Files not formatted:"
+        echo "$UNFORMATTED"
+        echo "Run: cd $proj && gofmt -w ."
+        exit 1
+    fi
+
+    echo "==> [$proj] go vet"
+    go vet ./...
+
+    echo "==> [$proj] golangci-lint"
+    if command -v golangci-lint &> /dev/null; then
+        golangci-lint run ./...
+    else
+        echo "  (skipped — golangci-lint not installed)"
+    fi
+
+    echo "==> [$proj] All checks passed."
+done
