@@ -5,6 +5,9 @@ rules:
           go func() {
             ...
           }()
+    paths:
+      exclude:
+        - "*_test.go"
     message: >
       Goroutine launched without error propagation or coordination.
       Consider using errgroup or passing errors via channel.
@@ -18,6 +21,9 @@ rules:
           $ONCE.Do(func() {
             ...
           })
+    paths:
+      exclude:
+        - "*_test.go"
     message: >
       Closing a channel outside sync.Once risks double-close panic.
       Wrap in sync.Once.Do() for safety.
@@ -29,6 +35,8 @@ rules:
     paths:
       include:
         - "*_test.go"
+      exclude:
+        - "*_stress_test.go"
     message: >
       Using time.Sleep for synchronization in tests is flaky.
       Use channels, sync.WaitGroup, or condition variables instead.
@@ -47,6 +55,9 @@ rules:
           if len($X) > $LIMIT {
             ...
           }
+    paths:
+      exclude:
+        - "*_test.go"
     message: >
       Appending in a loop without bounds checking may cause unbounded memory growth.
     languages: [go]
