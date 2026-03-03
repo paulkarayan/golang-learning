@@ -39,12 +39,10 @@ jobs:
           working-directory: dj-broadcast
 
       - name: semgrep
-        uses: returntocorp/semgrep-action@v1
-        with:
-          config: >
-            dj-broadcast/.semgrep.yml
-            p/golang
-            p/trailofbits
+        run: |
+          pip install semgrep
+          semgrep --config .semgrep.yml --config p/golang --config p/trailofbits .
+        working-directory: dj-broadcast
 
   gcatch:
     name: GCatch Concurrency Analysis

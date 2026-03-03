@@ -39,12 +39,10 @@ jobs:
           working-directory: snippetbox
 
       - name: semgrep
-        uses: returntocorp/semgrep-action@v1
-        with:
-          config: >
-            snippetbox/.semgrep.yml
-            p/golang
-            p/trailofbits
+        run: |
+          pip install semgrep
+          semgrep --config .semgrep.yml --config p/golang --config p/trailofbits .
+        working-directory: snippetbox
 
   gcatch:
     name: GCatch Concurrency Analysis
