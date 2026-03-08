@@ -145,9 +145,10 @@ func TestStationManagerGetNonexistent(t *testing.T) {
 	}
 }
 
-// TOCTOU on broadcast(): Get() returns a pointer, Stop() closes it,
-// then Send() silently drops data. The caller gets no error.
-// This test FAILS — proving the bug exists.
+// TOCTOU on broadcast() - found by AI review
+// 1. Get() returns a pointer to broadcaster
+// 2. Stop() called by another client closes it, deleting it from map
+// 3. Send() runs but silently drops data. The caller gets no error.
 func TestTOCTOU_SendAfterStop(t *testing.T) {
 	sm := NewStationManager()
 	sm.Create("radio")
@@ -175,8 +176,10 @@ func TestTOCTOU_SendAfterStop(t *testing.T) {
 	}
 }
 
-// TOCTOU on subscribe(): Get() returns a pointer, Stop() closes it,
-// active subscriber gets silently disconnected mid-stream.
+// TOCTOU on subscribe() - found by AI
+// 1. Get() returns a pointer to broadcaster
+// 2. Stop() closes it
+// 3. active subscriber gets silently disconnected mid-stream.
 // This test FAILS — proving the bug exists.
 func TestTOCTOU_SubscriberSilentDisconnect(t *testing.T) {
 	sm := NewStationManager()
