@@ -2,7 +2,7 @@ name: "dj-broadcast: Stress Tests"
 
 on:
   schedule:
-    - cron: '0 * * * *' # every hour
+    - cron: '17 6,12,18,0 * * *' # 4x daily
   workflow_dispatch: # manual trigger
 
 defaults:
