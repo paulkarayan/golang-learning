@@ -109,7 +109,7 @@ func (sm *StationManager) Send(id string, data []byte) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	b, ok := sm.stations[id]
-	if !ok {
+	if !ok || b.done {
 		return fmt.Errorf("station %s not found", id)
 	}
 	b.Send(data)

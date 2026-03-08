@@ -23,7 +23,7 @@ func (sm *StationManager) Create(id string) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
-	if _, ok := sm.stations[id]; ok {
+	if b, ok := sm.stations[id]; ok && !b.done {
 		return fmt.Errorf("station %s already exists", id)
 	}
 
@@ -39,6 +39,11 @@ func (sm *StationManager) Get(id string) (*Broadcaster, bool) {
 	defer sm.mu.Unlock()
 	// lookup
 	b, ok := sm.stations[id]
+	// if the entry is dead, clean it up
+	if ok && b.done {
+		delete(sm.stations, id)
+		return nil, false
+	}
 	return b, ok
 }
 
@@ -52,8 +57,7 @@ func (sm *StationManager) Stop(id string) error {
 		return fmt.Errorf("station %s not found", id)
 	}
 	b.Close()
-	// delete from map
-	delete(sm.stations, id)
+	// note that we no longer delete here. we're going to let readers drain
 	return nil
 
 }

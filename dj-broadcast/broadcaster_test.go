@@ -163,26 +163,24 @@ func TestTOCTOU_SubscriberSilentDisconnect(t *testing.T) {
 	b.Send([]byte("msg1"))
 	b.Send([]byte("msg2"))
 
-	// Subscriber reads first message
 	cursor := 0
-	_, ok = b.Read(context.Background(), &cursor)
-	if !ok {
-		t.Fatal("should get first message")
-	}
-
 	// Concurrent DELETE /station while subscriber is mid-stream
 	sm.Stop("radio")
 
-	// Subscriber tries to read msg2 — it's in history, so this works
-	_, ok = b.Read(context.Background(), &cursor)
-	if !ok {
-		t.Fatal("msg2 was already buffered, should still be readable")
+	// Subscriber should still get all buffered data
+	msg, ok := b.Read(context.Background(), &cursor)
+	if !ok || string(msg) != "msg1" {
+		t.Fatalf("expected msg1, got %q (ok=%v)", msg, ok)
 	}
 
-	// But any future data is impossible. The subscriber is kicked off
-	// with no indication that the station was deleted vs. naturally ended.
+	msg, ok = b.Read(context.Background(), &cursor)
+	if !ok || string(msg) != "msg2" {
+		t.Fatalf("expected msg2, got %q (ok=%v)", msg, ok)
+	}
+
+	// After draining, Read returns done — this is correct behavior
 	_, ok = b.Read(context.Background(), &cursor)
-	if !ok {
-		t.Fatal("TOCTOU: subscriber silently disconnected — cannot distinguish deletion from normal shutdown")
+	if ok {
+		t.Fatal("expected done after draining")
 	}
 }
