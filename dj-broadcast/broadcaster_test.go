@@ -145,37 +145,6 @@ func TestStationManagerGetNonexistent(t *testing.T) {
 	}
 }
 
-// TOCTOU on broadcast() - found by AI review
-// 1. Get() returns a pointer to broadcaster
-// 2. Stop() called by another client closes it, deleting it from map
-// 3. Send() runs but silently drops data. The caller gets no error.
-func TestTOCTOU_SendAfterStop(t *testing.T) {
-	sm := NewStationManager()
-	sm.Create("radio")
-
-	// Simulate broadcast() handler: get the pointer
-	b, ok := sm.Get("radio")
-	if !ok {
-		t.Fatal("station should exist")
-	}
-
-	// Simulate concurrent DELETE /station
-	sm.Stop("radio")
-
-	// Send on the stale pointer — this is what broadcast() does
-	b.Send([]byte("important data"))
-
-	// If the API were safe, Send on a stopped station should
-	// either be impossible or return an error. Instead it silently succeeds.
-	b.mu.Lock()
-	dataLost := b.done && len(b.history) == 0
-	b.mu.Unlock()
-
-	if dataLost {
-		t.Fatal("TOCTOU: Send() silently dropped data on a closed broadcaster — caller got no error")
-	}
-}
-
 // TOCTOU on subscribe() - found by AI
 // 1. Get() returns a pointer to broadcaster
 // 2. Stop() closes it

@@ -103,19 +103,36 @@ func subscribe(sm *StationManager) http.HandlerFunc {
 	}
 }
 
+// move the id check into SM to avoid TOCTOU error - TestTOCTOU_SendAfterStop
+
+func (sm *StationManager) Send(id string, data []byte) error {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	b, ok := sm.stations[id]
+	if !ok {
+		return fmt.Errorf("station %s not found", id)
+	}
+	b.Send(data)
+	return nil
+}
+
 func broadcast(sm *StationManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.URL.Query().Get("id")
-		b, ok := sm.Get(id)
-		if !ok {
-			http.Error(w, "station not found", http.StatusNotFound)
+		if id == "" {
+			http.Error(w, "missing id",
+				http.StatusBadRequest)
 			return
 		}
 		data, err := io.ReadAll(r.Body)
 		if err != nil {
-			http.Error(w, "bad body", http.StatusBadRequest)
+			http.Error(w, "bad body",
+				http.StatusBadRequest)
 			return
 		}
-		b.Send(data)
+		if err := sm.Send(id, data); err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
 	}
 }

@@ -190,7 +190,7 @@ make: *** [lint] Error 1
   since the closes are inside the monitor goroutine.
   3. use-tls — http.ListenAndServe without TLS. This is a dev server, suppress or upgrade later.
   4. XSS on w.Write(msg) — line 93 writes raw broadcast bytes to the response. This is an audio/data stream, not an HTML page. False
-  positive for your use case. Suppress with // nosemgrep: go.net.xss.no-direct-write-to-responsewriter-taint.
+  positive for your use case. Suppress with // wh: go.net.xss.no-direct-write-to-responsewriter-taint.
 
 
 line 171-175:
