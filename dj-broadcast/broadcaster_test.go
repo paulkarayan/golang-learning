@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	"fmt"
+	"context"
 	"testing"
 )
 
@@ -10,13 +10,15 @@ func TestBroadcasterSendReceive(t *testing.T) {
 	b := NewBroadcaster()
 	defer b.Close()
 
-	id, ch := b.Subscribe()
-	_ = id
-	fmt.Println("subscribed with id:", id, "ch:", ch)
-
 	b.Send([]byte("ahoy hoy"))
 
-	msg := <-ch
+	cursor := 0
+
+	msg, ok := b.Read(context.Background(), &cursor)
+
+	if !ok {
+		t.Fatal("expected data, got done")
+	}
 	if string(msg) != "ahoy hoy" {
 		t.Fatalf("expected 'ahoy hoy', got %q", string(msg))
 	}
@@ -26,33 +28,17 @@ func TestTwoSubscribers(t *testing.T) {
 	b := NewBroadcaster()
 	defer b.Close()
 
-	_, ch1 := b.Subscribe()
-	_, ch2 := b.Subscribe()
-
 	b.Send([]byte("same message"))
 
-	msg1 := <-ch1
-	msg2 := <-ch2
+	client1, client2 := 0, 0
+	msg1, _ := b.Read(context.Background(), &client1)
+	msg2, _ := b.Read(context.Background(), &client2)
 
 	if string(msg1) != "same message" {
 		t.Fatalf("ch1: expected 'same message', got %q", string(msg1))
 	}
 	if string(msg2) != "same message" {
 		t.Fatalf("ch2: expected 'same message', got %q", string(msg2))
-	}
-}
-
-func TestUnsubscribe(t *testing.T) {
-	b := NewBroadcaster()
-	defer b.Close()
-
-	id, ch := b.Subscribe()
-	b.Unsubscribe(id)
-
-	// channel should be closed
-	_, ok := <-ch
-	if ok {
-		t.Fatal("expected channel to be closed")
 	}
 }
 
@@ -64,10 +50,9 @@ func TestLateSubscriberGetsHistory(t *testing.T) {
 	b.Send([]byte("first"))
 	b.Send([]byte("second"))
 
-	_, ch := b.Subscribe()
-
-	msg1 := <-ch
-	msg2 := <-ch
+	cursor := 0
+	msg1, _ := b.Read(context.Background(), &cursor)
+	msg2, _ := b.Read(context.Background(), &cursor)
 
 	if string(msg1) != "first" {
 		t.Fatalf("expected 'first', got %q", msg1)
@@ -82,36 +67,34 @@ func TestBinaryData(t *testing.T) {
 	b := NewBroadcaster()
 	defer b.Close()
 
-	_, ch := b.Subscribe()
-
 	data := []byte{0x00, 0xFF, 0x89, 0x50, 0x4E, 0x47}
 	b.Send(data)
 
-	msg := <-ch
+	cursor := 0
+	msg, _ := b.Read(context.Background(), &cursor)
 	if !bytes.Equal(msg, data) {
 		t.Fatalf("expected %x, got %x", data, msg)
 	}
 }
 
-func TestCloseShutsDownAll(t *testing.T) {
+func TestCloseShutsDownWithoutDataLoss(t *testing.T) {
 	b := NewBroadcaster()
-
-	_, ch1 := b.Subscribe()
-	_, ch2 := b.Subscribe()
-
+	b.Send([]byte("made it before the bell"))
+	// we explicitly call this. no Defer
 	b.Close()
-	// note: this wont work. because we're closing explicitly... it'd block
-	// 4eva. ask me how i know.
-	// defer b.Close()
 
-	_, ok1 := <-ch1
-	_, ok2 := <-ch2
+	cursor := 0
+	msg, ok := b.Read(context.Background(), &cursor)
 
-	if ok1 {
-		t.Fatal("expected ch1 to be closed")
+	// history has survived close
+	if !ok || string(msg) != "made it before the bell" {
+		t.Fatalf("expected 'made it before the bell', got %q (ok=%v)", msg, ok)
 	}
-	if ok2 {
-		t.Fatal("expected ch2 to be closed")
+
+	// there is nothing left after read
+	_, ok = b.Read(context.Background(), &cursor)
+	if ok {
+		t.Fatal("expected done after draining")
 	}
 }
 

@@ -2,11 +2,9 @@ package main
 
 import (
 	"crypto/tls"
-	"crypto/x509"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 )
@@ -140,31 +138,28 @@ func TestServerTLS(t *testing.T) {
 // }
 
 func TestMTLSAcceptsValidClientCert(t *testing.T) {
-	caCert, _ := os.ReadFile("../tls/ca-cert.pem")
-	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM(caCert)
+	ca := newTestCA(t)
 
 	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cn := r.TLS.PeerCertificates[0].Subject.CommonName
 		w.Write([]byte("yo " + cn))
 	}))
 	ts.TLS = &tls.Config{
-		ClientCAs:  caCertPool,
+		ClientCAs:  ca.pool,
 		ClientAuth: tls.RequireAndVerifyClientCert,
 	}
 	ts.StartTLS()
 	defer ts.Close()
 
-	// trust test server's cert
-	caCertPool.AddCert(ts.Certificate())
+	// trust the test server's own cert too
+	ca.pool.AddCert(ts.Certificate())
 
-	// client WITH valid client cert
-	cert, _ := tls.LoadX509KeyPair("../tls/client-admin-cert.pem", "../tls/client-admin-key.pem")
+	clientCert := ca.issueCert(t, "admin", "localhost")
 	client := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
-				RootCAs:      caCertPool,
-				Certificates: []tls.Certificate{cert},
+				RootCAs:      ca.pool,
+				Certificates: []tls.Certificate{clientCert},
 			},
 		},
 	}
@@ -179,33 +174,28 @@ func TestMTLSAcceptsValidClientCert(t *testing.T) {
 	}
 }
 
-// reject requests with no client cert
 func TestMTLSRejectsNoClientCert(t *testing.T) {
-	// load CA
-	caCert, _ := os.ReadFile("./tls/ca-cert.pem")
-	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM(caCert)
+	ca := newTestCA(t)
 
-	// server that requires client certs
 	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
 	}))
 	ts.TLS = &tls.Config{
-		ClientCAs:  caCertPool,
+		ClientCAs:  ca.pool,
 		ClientAuth: tls.RequireAndVerifyClientCert,
 	}
 	ts.StartTLS()
 	defer ts.Close()
 
 	// client with NO client cert — should fail
+	ca.pool.AddCert(ts.Certificate())
 	client := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
-				RootCAs: caCertPool,
+				RootCAs: ca.pool,
 			},
 		},
 	}
-	// we want the response to have an error...
 	_, err := client.Get(ts.URL) //nolint:bodyclose
 	if err == nil {
 		t.Fatal("expected error, got none — server accepted request without client cert")

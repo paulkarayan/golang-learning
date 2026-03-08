@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -153,72 +154,80 @@ func TestListenNonexistent(t *testing.T) {
 	}
 }
 
-// tests the slow reader behavior happens
-func TestSlowReader(t *testing.T) {
+// tests the slow reader behavior happens - it gets all messages.
+// we are no longer dropping
+func TestSlowReaderGetsAllHistory(t *testing.T) {
 	b := NewBroadcaster()
 	defer b.Close()
 
-	_, ch := b.Subscribe()
-
-	// send more than the buffer size (10)
-	for i := 0; i < 15; i++ {
+	for i := 0; i < 1500; i++ {
 		b.Send([]byte(fmt.Sprintf("msg %d", i)))
 	}
 
-	// should only get 10 (buffer size), rest (5) are dropped
+	cursor := 0
 	count := 0
-	for {
-		select {
-		case _, ok := <-ch:
-			if !ok {
-				t.Fatal("channel closed unexpectedly")
-			}
-			count++
-		default:
-			// nothing left in buffer
-			goto done
+	for count < 1500 {
+		_, ok := b.Read(context.Background(), &cursor)
+		if !ok {
+			break
 		}
+		count++
 	}
-done:
-	if count != 10 {
-		t.Fatalf("expected 10 messages, got %d", count)
+	if count != 1500 {
+		t.Fatalf("expected 1500 messages, got %d", count)
 	}
 }
 
 // we expect that slow readers will not slow everyone else down
+// which i'm testing with: independent readers appear to not blocked. both
+// cursors can advance indendently
 
 func TestSlowReaderDoesntBlockOthers(t *testing.T) {
 	b := NewBroadcaster()
 	defer b.Close()
 
-	_, slow := b.Subscribe()
-	_, fast := b.Subscribe()
-
-	// fill slow reader's buffer
+	// fill buffer
 	for i := 0; i < 15; i++ {
 		b.Send([]byte(fmt.Sprintf("msg %d", i)))
 	}
 
-	// fast reader drains immediately — should get 10
-	count := 0
-	// weird... but ok.
-loop:
-	for {
-		select {
-		case <-fast:
-			count++
-		default:
-			break loop
-		}
+	// fast reader drains immediately — should get 15
+	c1, c2 := 0, 0
+	for i := 0; i < 15; i++ {
+		b.Read(context.Background(), &c1)
+	}
+	for i := 0; i < 15; i++ {
+		b.Read(context.Background(), &c2)
 	}
 
-	if count != 10 {
-		t.Fatalf("fast reader expected 10, got %d", count)
+	if c1 != 15 || c2 != 15 {
+		t.Fatalf("expected both cursors at 15, got c1=%d c2=%d", c1, c2)
 	}
 
-	// we wouldnt get to this point if slow reader blocked Send
-	// but we're just suppressing the unused var error
-	_ = slow
+}
+
+// later may replace with a stress test
+
+func TestManyListeners(t *testing.T) {
+	b := NewBroadcaster()
+	defer b.Close()
+
+	b.Send([]byte("broadcast to all"))
+
+	// allow all 1000 goroutines to finish before ending the test...
+	var wg sync.WaitGroup
+	for i := 0; i < 1000; i++ {
+		wg.Add(1)
+		go func(n int) {
+			defer wg.Done()
+			cursor := 0
+			msg, ok := b.Read(context.Background(), &cursor)
+			if !ok || string(msg) != "broadcast to all" {
+				t.Errorf("listener %d: got %q ok=%v", n, msg, ok)
+			}
+		}(i)
+	}
+	wg.Wait()
 }
 
 func TestCleanupOnDisconnect(t *testing.T) {
@@ -257,54 +266,101 @@ func TestCleanupOnDisconnect(t *testing.T) {
 	}
 }
 
+// Note: tried to not make this overlap with TestCloseShutsDownWithoutDataLoss
+// this has a reader blocked waiting for more data.
+// I don't love it. we might want to save this for stress testing for the timing
+// element
+func TestServerDropsMidStream(t *testing.T) {
+	b := NewBroadcaster()
+
+	b.Send([]byte("first"))
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		cursor := 0
+
+		// gets "first" fine
+		msg, ok := b.Read(context.Background(), &cursor)
+		if !ok || string(msg) != "first" {
+			t.Errorf("expected 'first', got %q", msg)
+			return
+		}
+
+		// blocks here waiting for more data. then
+		// Close() wakes it up
+		_, ok = b.Read(context.Background(), &cursor)
+		if ok {
+			t.Errorf("expected done after close")
+		}
+	}()
+
+	// give reader time to block on second Read
+	time.Sleep(50 * time.Millisecond)
+	b.Close()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("reader goroutine didn't exit after Close")
+	}
+}
+
+func TestReadAfterClose(t *testing.T) {
+	b := NewBroadcaster()
+
+	b.Send([]byte("a"))
+	b.Send([]byte("b"))
+	b.Send([]byte("zed"))
+	b.Close()
+
+	// client shows up after the job is done
+	cursor := 0
+	var msgs []string
+	for {
+		msg, ok := b.Read(context.Background(), &cursor)
+		if !ok {
+			break
+		}
+		msgs = append(msgs, string(msg))
+	}
+
+	if len(msgs) != 3 {
+		t.Fatalf("expected 3 messages, got %d", len(msgs))
+	}
+	if msgs[0] != "a" || msgs[1] != "b" || msgs[2] != "zed" {
+		t.Fatalf("unexpected messages: %v", msgs)
+	}
+}
+
+func TestDisconnectMidStream(t *testing.T) {
+	b := NewBroadcaster()
+	defer b.Close()
+
+	b.Send([]byte("first"))
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// read first message fine
+	cursor := 0
+	msg, ok := b.Read(ctx, &cursor)
+	if !ok || string(msg) != "first" {
+		t.Fatalf("expected 'first', got %q", msg)
+	}
+
+	// cancel before next message arrives
+	cancel()
+
+	// Read should return false, not block forever
+	_, ok = b.Read(ctx, &cursor)
+	if ok {
+		t.Fatal("expected Read to return false after context cancel")
+	}
+}
+
 func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m,
 		goleak.IgnoreTopFunction("net/http.(*persistConn).readLoop"),
 		goleak.IgnoreTopFunction("net/http.(*persistConn).writeLoop"),
 	)
-}
-
-func TestManyListeners(t *testing.T) {
-	b := NewBroadcaster()
-	defer b.Close()
-
-	numListeners := 1000
-	channels := make([]chan []byte, numListeners)
-
-	for i := 0; i < numListeners; i++ {
-		_, ch := b.Subscribe()
-		channels[i] = ch
-	}
-
-	b.Send([]byte("broadcast to all"))
-
-	for i, ch := range channels {
-		msg := <-ch
-		if string(msg) != "broadcast to all" {
-			t.Fatalf("listener %d: expected 'broadcast to all', got %q", i, msg)
-		}
-	}
-}
-
-func TestServerDropsMidStream(t *testing.T) {
-	b := NewBroadcaster()
-
-	_, ch := b.Subscribe()
-
-	b.Send([]byte("first"))
-
-	// server kills the station
-	b.Close()
-
-	// listener should see the first message
-	msg := <-ch
-	if string(msg) != "first" {
-		t.Fatalf("expected 'first', got %q", msg)
-	}
-
-	// next read should get closed channel
-	_, ok := <-ch
-	if ok {
-		t.Fatal("expected channel to be closed")
-	}
 }

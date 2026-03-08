@@ -3,9 +3,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"net"
-	"os"
 	"testing"
 
 	"google.golang.org/grpc"
@@ -81,36 +79,29 @@ func TestGRPCCreateSnippet(t *testing.T) {
 }
 
 func TestGRPCWithMTLS(t *testing.T) {
-	// load CA
-	caCert, _ := os.ReadFile("../tls/ca-cert.pem")
-	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM(caCert)
+	ca := newTestCA(t)
+	serverCert := ca.issueCert(t, "localhost", "localhost")
 
-	// server TLS config — require client certs
-	serverCert, _ := tls.LoadX509KeyPair("../tls/server-cert.pem", "../tls/server-key.pem")
 	serverTLS := &tls.Config{
 		Certificates: []tls.Certificate{serverCert},
-		ClientCAs:    caCertPool,
+		ClientCAs:    ca.pool,
 		ClientAuth:   tls.RequireAndVerifyClientCert,
 	}
 
-	// start gRPC server. localhost:0 picks a random free port
-	lis, _ := net.Listen("tcp", "localhost:0")
+	lis, err := net.Listen("tcp", "localhost:0")
+	if err != nil {
+		t.Fatal(err)
+	}
 	s := grpc.NewServer(grpc.Creds(credentials.NewTLS(serverTLS)))
 	pb.RegisterSnippetBoxServer(s, &grpcServer{})
 	go func() { s.Serve(lis) }()
 	t.Cleanup(func() { s.Stop() })
 
-	// client with valid cert
-	clientCert, _ := tls.LoadX509KeyPair("../tls/client-admin-cert.pem",
-		"../tls/client-admin-key.pem")
+	clientCert := ca.issueCert(t, "admin", "localhost")
 	clientTLS := &tls.Config{
 		Certificates: []tls.Certificate{clientCert},
-		RootCAs:      caCertPool,
-		// we had to add this because
-		// cert's SAN has the hostname localhost but the TLS client
-		// is verifying against the IP 127.0.0.1
-		ServerName: "localhost",
+		RootCAs:      ca.pool,
+		ServerName:   "localhost",
 	}
 
 	conn, err := grpc.NewClient(lis.Addr().String(),
@@ -131,21 +122,20 @@ func TestGRPCWithMTLS(t *testing.T) {
 	}
 }
 
-// equivalent of createRole tests w diff. transport layer
 func TestGRPCInterceptorRejectsUserOnCreate(t *testing.T) {
-	// same server setup as TestGRPCWithMTLS but with the interceptor
-	caCert, _ := os.ReadFile("../tls/ca-cert.pem")
-	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM(caCert)
+	ca := newTestCA(t)
+	serverCert := ca.issueCert(t, "localhost", "localhost")
 
-	serverCert, _ := tls.LoadX509KeyPair("../tls/server-cert.pem", "../tls/server-key.pem")
 	serverTLS := &tls.Config{
 		Certificates: []tls.Certificate{serverCert},
-		ClientCAs:    caCertPool,
+		ClientCAs:    ca.pool,
 		ClientAuth:   tls.RequireAndVerifyClientCert,
 	}
 
-	lis, _ := net.Listen("tcp", "localhost:0")
+	lis, err := net.Listen("tcp", "localhost:0")
+	if err != nil {
+		t.Fatal(err)
+	}
 	s := grpc.NewServer(
 		grpc.Creds(credentials.NewTLS(serverTLS)),
 		grpc.UnaryInterceptor(roleInterceptor()),
@@ -155,23 +145,25 @@ func TestGRPCInterceptorRejectsUserOnCreate(t *testing.T) {
 	t.Cleanup(func() { s.Stop() })
 
 	// user cert, NOT admin
-	clientCert, _ := tls.LoadX509KeyPair("../tls/client-user-cert.pem",
-		"../tls/client-user-key.pem")
+	clientCert := ca.issueCert(t, "user", "localhost")
 	clientTLS := &tls.Config{
 		Certificates: []tls.Certificate{clientCert},
-		RootCAs:      caCertPool,
+		RootCAs:      ca.pool,
 		ServerName:   "localhost",
 	}
 
-	conn, _ := grpc.NewClient(lis.Addr().String(),
+	conn, err := grpc.NewClient(lis.Addr().String(),
 		grpc.WithTransportCredentials(credentials.NewTLS(clientTLS)),
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer conn.Close()
 
 	client := pb.NewSnippetBoxClient(conn)
 
 	// CreateSnippet should fail — user doesn't have admin role
-	_, err := client.CreateSnippet(context.Background(), &pb.CreateSnippetRequest{
+	_, err = client.CreateSnippet(context.Background(), &pb.CreateSnippetRequest{
 		Title: "test", Content: "test", Expires: 7,
 	})
 	if err == nil {

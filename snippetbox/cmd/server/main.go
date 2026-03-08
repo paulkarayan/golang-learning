@@ -52,34 +52,54 @@ func requireRole(role string, next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// map method → role, same as map HTTP route → role.
+// roleForMethod maps gRPC method → required role, same as HTTP route → role.
+func roleForMethod(fullMethod string) string {
+	switch fullMethod {
+	case "/snippetbox.SnippetBox/CreateSnippet":
+		return "admin"
+	default:
+		return "user"
+	}
+}
+
+// checkCertRole extracts the CN from the client cert in the context
+// and verifies it matches the required role. Same logic as requireRole
+// for HTTP, but we pull the cert from the context instead of r.TLS.
+func checkCertRole(ctx context.Context, role string) error {
+	p, ok := peer.FromContext(ctx)
+	if !ok {
+		return status.Error(codes.Unauthenticated, "no peer info")
+	}
+	tlsInfo, ok := p.AuthInfo.(credentials.TLSInfo)
+	if !ok || len(tlsInfo.State.PeerCertificates) == 0 {
+		return status.Error(codes.Unauthenticated, "no client cert")
+	}
+	cn := tlsInfo.State.PeerCertificates[0].Subject.CommonName
+	if cn != role && cn != "admin" {
+		return status.Error(codes.PermissionDenied, "forbidden: requires "+role)
+	}
+	return nil
+}
+
+// unary interceptor — for request/response RPCs (Home, GetSnippet, CreateSnippet)
 func roleInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo,
 		handler grpc.UnaryHandler) (interface{}, error) {
-		// figure out which role this method needs
-		var role string
-		switch info.FullMethod {
-		case "/snippetbox.SnippetBox/CreateSnippet":
-			role = "admin"
-		default:
-			role = "user"
-		}
-
-		// same cert check as before
-		// note that we use context the way i use a request object for http
-		p, ok := peer.FromContext(ctx)
-		if !ok {
-			return nil, status.Error(codes.Unauthenticated, "no peer info")
-		}
-		tlsInfo, ok := p.AuthInfo.(credentials.TLSInfo)
-		if !ok || len(tlsInfo.State.PeerCertificates) == 0 {
-			return nil, status.Error(codes.Unauthenticated, "no client cert")
-		}
-		cn := tlsInfo.State.PeerCertificates[0].Subject.CommonName
-		if cn != role && cn != "admin" {
-			return nil, status.Error(codes.PermissionDenied, "forbidden: requires "+role)
+		if err := checkCertRole(ctx, roleForMethod(info.FullMethod)); err != nil {
+			return nil, err
 		}
 		return handler(ctx, req)
+	}
+}
+
+// stream interceptor — for streaming RPCs (e.g. ListSnippets)
+func streamRoleInterceptor() grpc.StreamServerInterceptor {
+	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo,
+		handler grpc.StreamHandler) error {
+		if err := checkCertRole(ss.Context(), roleForMethod(info.FullMethod)); err != nil {
+			return err
+		}
+		return handler(srv, ss)
 	}
 }
 
@@ -135,7 +155,11 @@ func main() {
 	// now grpc
 
 	creds := credentials.NewTLS(tlsConfig)
-	grpcSrv := grpc.NewServer(grpc.Creds(creds), grpc.UnaryInterceptor(roleInterceptor()))
+	grpcSrv := grpc.NewServer(
+		grpc.Creds(creds),
+		grpc.UnaryInterceptor(roleInterceptor()),
+		grpc.StreamInterceptor(streamRoleInterceptor()),
+	)
 	pb.RegisterSnippetBoxServer(grpcSrv, &grpcServer{})
 
 	// we have to do this in goroutine so we can run second server wo blocking

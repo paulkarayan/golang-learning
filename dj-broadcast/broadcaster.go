@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"sync"
 )
@@ -59,124 +60,74 @@ func (sm *StationManager) Stop(id string) error {
 
 }
 
-// use the monitor goroutine pattern a la bank example
+// use a sync.Cond pattern instead.
+// state is in one shared byte buffer and one sync.Cond var per job
+// Cond provides a mutex to protect the buffer
+// note we dont need to keep subs or subs nextid anymore
 type Broadcaster struct {
-	subscribeCh   chan subRequest
-	unsubscribeCh chan int
-	sendCh        chan []byte
-	closeCh       chan struct{}
+	mu      sync.Mutex
+	cond    *sync.Cond
+	history [][]byte
+	done    bool
 }
 
-type subRequest struct {
-	resp chan subResponse
-}
-
-type subResponse struct {
-	id int
-	ch chan []byte
-}
-
-// the goroutine (monitor) here is the only one that reads from channels, touches
-// the state in the station map and history
-// NOTE: see the history comment above. i'm not correct.
+// create Cond variable & associated mutex
 func NewBroadcaster() *Broadcaster {
-	b := &Broadcaster{
-		subscribeCh:   make(chan subRequest),
-		unsubscribeCh: make(chan int),
-		sendCh:        make(chan []byte),
-		closeCh:       make(chan struct{}, 1), // lets avoid the double close problem. make this a non-blocking send
-	}
-	// go b.run() — start the monitor goroutine, which runs until Close
-	go b.run()
+	b := &Broadcaster{}
+	b.cond = sync.NewCond(&b.mu)
 	return b
 }
 
-func (b *Broadcaster) run() {
-	subscribers := make(map[int]chan []byte)
-	// note: var is more idiomatic if you dont need initialize w values apparently
-	history := [][]byte{}
-	nextID := 0
-
-	for {
-		select {
-		case req := <-b.subscribeCh:
-			// assign id
-			id := nextID
-			nextID++
-			// make channel
-			// aribtary 10 message buffer, would tune for slow client behavior
-			ch := make(chan []byte, 10)
-			// send history
-			for _, h := range history {
-				ch <- h
-			}
-
-			// add to map and reply via req.resp
-			subscribers[id] = ch
-			req.resp <- subResponse{id: id, ch: ch}
-			// fmt.Printf("subscribers: %v, history len: %d\n", subscribers, len(history))
-
-		case id := <-b.unsubscribeCh:
-			// close channel, delete from map
-			if ch, ok := subscribers[id]; ok {
-				// we can't double close because monitor pattern, so suppress
-				close(ch) // nosemgrep: channel-close-without-once
-				delete(subscribers, id)
-			}
-
-		case data := <-b.sendCh:
-			// append to history
-			// note that the ring buffer below handles the case but semgrep still spots it, so suppress
-			history = append(history, data) // nosemgrep: unbounded-append-in-loop
-			// add a ring buffer so this doesnt grow unbounded. thx semgrep!
-			if len(history) > 100 {
-				history = history[1:]
-			}
-			// send to all subscribers
-			for _, ch := range subscribers {
-				select {
-				case ch <- data:
-				default:
-					// drop if channel is full. how do we wanna handle?
-				}
-			}
-
-		case <-b.closeCh:
-			// close all subscriber channels
-			for _, ch := range subscribers {
-				// we cant double close bc monitor pattern, so suppress semgrep
-				close(ch) // nosemgrep: channel-close-without-once
-			}
-			// return (kills the _monitor_ goroutine)
-			return
-		}
-	}
-}
-
-func (b *Broadcaster) Subscribe() (id int, ch chan []byte) {
-	// send subRequest, wait for response
-	req := subRequest{resp: make(chan subResponse)}
-	b.subscribeCh <- req
-	res := <-req.resp
-	return res.id, res.ch
-}
-
-func (b *Broadcaster) Unsubscribe(id int) {
-	// send id to unsubscribeCh
-	b.unsubscribeCh <- id
-}
-
 func (b *Broadcaster) Send(data []byte) {
-	// send data to sendCh
-	b.sendCh <- data
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	// ensure the process hasn't terminated already
+	if b.done {
+		return
+	}
+	// otherwise, append your data to the history buffer
+	// and tell the clients about it via Broadcast
+	b.history = append(b.history, data)
+	b.cond.Broadcast()
 }
 
 func (b *Broadcaster) Close() {
-	// send to closeCh
-	// use the buffered channel of size 1, non-blocking send
-	// "signal at most once" channels
-	select {
-	case b.closeCh <- struct{}{}: // apparently this is a convention for signal only channel as 0 byte
-	default:
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	// if the process has terminated, set the done flag
+	if b.done {
+		return
 	}
+	b.done = true
+
+	// then wake all the clients to tell them
+	b.cond.Broadcast()
+}
+
+// IMPORTANT: the caller is responsible for behavior when context is cancelled, which would
+// happen if client disconnects (like request context cancels).
+// we'll set that up in the http handler. otherwise there's a goroutine leak
+func (b *Broadcaster) Read(ctx context.Context, cursor *int) ([]byte, bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	// wait until there's new data, we're done, or context is cancelled
+	for *cursor >= len(b.history) && !b.done {
+		if ctx.Err() != nil {
+			return nil, false
+		}
+		b.cond.Wait()
+	}
+
+	// data available — return it
+	if *cursor < len(b.history) {
+		data := b.history[*cursor]
+		*cursor++
+		return data, true
+	}
+
+	// done and fully drained
+	return nil, false
 }

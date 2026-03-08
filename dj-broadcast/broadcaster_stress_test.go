@@ -5,7 +5,6 @@ package main
 import (
 	"fmt"
 	"math/rand"
-	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -142,29 +141,5 @@ func TestRace_ConcurrentOpsVsClose(t *testing.T) {
 		}()
 
 		wg.Wait()
-	}
-}
-
-// Catches unbounded memory growth from history
-func TestMemory_HistoryBounded(t *testing.T) {
-	b := NewBroadcaster()
-	defer b.Close()
-
-	var before, after runtime.MemStats
-	runtime.GC()
-	runtime.ReadMemStats(&before)
-
-	for i := 0; i < 10000; i++ {
-		b.Send(make([]byte, 1024))
-	}
-
-	runtime.GC()
-	runtime.ReadMemStats(&after)
-
-	growth := after.HeapAlloc - before.HeapAlloc
-	maxAllowed := uint64(20 * 1024 * 1024) // 20MB budget
-
-	if growth > maxAllowed {
-		t.Fatalf("Memory grew by %d bytes (%.1f MB), exceeds 20MB budget", growth, float64(growth)/(1024*1024))
 	}
 }

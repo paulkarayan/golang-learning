@@ -1,4 +1,4 @@
-.PHONY: test race lint vet fmt fmt-check semgrep gcatch stress ci ci-full setup-hooks
+.PHONY: test race lint vet fmt fmt-check semgrep gcatch stress ci ci-full setup-hooks llm-review
 
 ## Run unit tests
 test:
@@ -41,6 +41,11 @@ ci: fmt-check vet lint semgrep race
 
 ## Run everything including stress (slow)
 ci-full: ci stress
+
+## LLM concurrency review via Claude Code
+llm-review:
+	@FILES=$$(find . -name '*.go' -not -name '*_test.go' -not -path './cmd/proto/*' | tr '\n' ' '); \
+	claude -p "Review these Go files for concurrency bugs: $$FILES. Read each file and check for: data races, TOCTOU patterns, goroutine leaks, missing error handling on Close/Read/Write/Dial, unprotected shared state, channel misuse, mutex issues. Report ONLY real issues with file path, line number, and brief explanation. No false positives."
 
 ## Set up git hooks
 setup-hooks:

@@ -74,8 +74,6 @@ func subscribe(sm *StationManager) http.HandlerFunc {
 			http.Error(w, "station not found", http.StatusNotFound)
 			return
 		}
-		subID, ch := b.Subscribe()
-		defer b.Unsubscribe(subID)
 
 		// we have to push the data in the handler buffer to the client
 		flusher, ok := w.(http.Flusher)
@@ -84,17 +82,21 @@ func subscribe(sm *StationManager) http.HandlerFunc {
 			return
 		}
 
+		// this is the context bit to avoid a leak!
+		// WE - the caller - must wake Read when client disconnects
+		go func() {
+			<-r.Context().Done()
+			b.cond.Broadcast()
+		}()
+
+		cursor := 0
 		for {
-			select {
-			case msg, ok := <-ch:
-				if !ok {
-					return // station closed
-				}
-				w.Write(msg) // nosemgrep: go.net.xss.no-direct-write-to-responsewriter-taint.no-direct-write-to-responsewriter-taint
-				flusher.Flush()
-			case <-r.Context().Done():
-				return // client disconnected
+			data, ok := b.Read(r.Context(), &cursor)
+			if !ok {
+				return
 			}
+			w.Write(data)
+			flusher.Flush()
 		}
 	}
 }
