@@ -8,7 +8,7 @@ import (
 
 // using mutex here to protect the station map.
 type StationManager struct {
-	mu       sync.Mutex
+	mu       Mutex
 	stations map[string]*Broadcaster
 }
 
@@ -34,18 +34,16 @@ func (sm *StationManager) Create(id string) error {
 }
 
 func (sm *StationManager) Get(id string) (*Broadcaster, bool) {
-	// lock,
+	// lock
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	// lookup
-
 	b, ok := sm.stations[id]
 	return b, ok
 }
 
 func (sm *StationManager) Stop(id string) error {
 	// lock
-
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	// close broadcaster after finding by id
@@ -65,7 +63,7 @@ func (sm *StationManager) Stop(id string) error {
 // Cond provides a mutex to protect the buffer
 // note we dont need to keep subs or subs nextid anymore
 type Broadcaster struct {
-	mu      sync.Mutex
+	mu      Mutex
 	cond    *sync.Cond
 	history [][]byte
 	done    bool

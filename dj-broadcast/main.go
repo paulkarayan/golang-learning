@@ -10,7 +10,7 @@ import (
 func main() {
 	srv := newServer()
 	fmt.Println("listening on :8080")
-	log.Fatal(http.ListenAndServe(":8080", srv)) // nosemgrep: go.lang.security.audit.net.use-tls.use-tls
+	log.Fatal(http.ListenAndServe(":8080", srv)) //nolint:gosec // nosemgrep: go.lang.security.audit.net.use-tls.use-tls
 }
 
 func newServer() http.Handler {
@@ -40,7 +40,7 @@ func createStation(sm *StationManager) http.HandlerFunc {
 		}
 		// remember Go returns a 200 unless we change it
 		w.WriteHeader(http.StatusCreated)
-		fmt.Fprintln(w, "station created:", id) //nolint:errcheck
+		fmt.Fprintln(w, "station created:", id) //nolint:errcheck,gosec
 	}
 }
 
@@ -57,7 +57,7 @@ func deleteStation(sm *StationManager) http.HandlerFunc {
 			return
 		}
 
-		fmt.Fprintln(w, "station deleted:", id) //nolint:errcheck
+		fmt.Fprintln(w, "station deleted:", id) //nolint:errcheck,gosec
 	}
 }
 
@@ -95,7 +95,9 @@ func subscribe(sm *StationManager) http.HandlerFunc {
 			if !ok {
 				return
 			}
-			w.Write(data)
+			if _, err := w.Write(data); err != nil { //nolint:gosec // raw audio stream, not HTML
+				return
+			}
 			flusher.Flush()
 		}
 	}

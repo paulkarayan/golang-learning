@@ -144,3 +144,73 @@ func TestStationManagerGetNonexistent(t *testing.T) {
 		t.Fatal("expected station to not exist")
 	}
 }
+
+// TOCTOU on broadcast(): Get() returns a pointer, Stop() closes it,
+// then Send() silently drops data. The caller gets no error.
+// This test FAILS — proving the bug exists.
+func TestTOCTOU_SendAfterStop(t *testing.T) {
+	sm := NewStationManager()
+	sm.Create("radio")
+
+	// Simulate broadcast() handler: get the pointer
+	b, ok := sm.Get("radio")
+	if !ok {
+		t.Fatal("station should exist")
+	}
+
+	// Simulate concurrent DELETE /station
+	sm.Stop("radio")
+
+	// Send on the stale pointer — this is what broadcast() does
+	b.Send([]byte("important data"))
+
+	// If the API were safe, Send on a stopped station should
+	// either be impossible or return an error. Instead it silently succeeds.
+	b.mu.Lock()
+	dataLost := b.done && len(b.history) == 0
+	b.mu.Unlock()
+
+	if dataLost {
+		t.Fatal("TOCTOU: Send() silently dropped data on a closed broadcaster — caller got no error")
+	}
+}
+
+// TOCTOU on subscribe(): Get() returns a pointer, Stop() closes it,
+// active subscriber gets silently disconnected mid-stream.
+// This test FAILS — proving the bug exists.
+func TestTOCTOU_SubscriberSilentDisconnect(t *testing.T) {
+	sm := NewStationManager()
+	sm.Create("radio")
+
+	// Simulate subscribe() handler: get the pointer, start reading
+	b, ok := sm.Get("radio")
+	if !ok {
+		t.Fatal("station should exist")
+	}
+
+	b.Send([]byte("msg1"))
+	b.Send([]byte("msg2"))
+
+	// Subscriber reads first message
+	cursor := 0
+	_, ok = b.Read(context.Background(), &cursor)
+	if !ok {
+		t.Fatal("should get first message")
+	}
+
+	// Concurrent DELETE /station while subscriber is mid-stream
+	sm.Stop("radio")
+
+	// Subscriber tries to read msg2 — it's in history, so this works
+	_, ok = b.Read(context.Background(), &cursor)
+	if !ok {
+		t.Fatal("msg2 was already buffered, should still be readable")
+	}
+
+	// But any future data is impossible. The subscriber is kicked off
+	// with no indication that the station was deleted vs. naturally ended.
+	_, ok = b.Read(context.Background(), &cursor)
+	if !ok {
+		t.Fatal("TOCTOU: subscriber silently disconnected — cannot distinguish deletion from normal shutdown")
+	}
+}

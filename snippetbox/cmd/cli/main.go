@@ -22,7 +22,7 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 
 	// no args
 	if len(args) < 1 {
-		fmt.Fprintln(stdout, "expected 'foo' or 'bar' subcommands") //nolint:errcheck
+		fmt.Fprintln(stdout, "expected 'foo' or 'bar' subcommands") //nolint:errcheck,gosec
 		return 1
 	}
 
@@ -33,22 +33,26 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 		fooEnable := fooCmd.Bool("enable", false, "enable")
 		fooName := fooCmd.String("name", "", "name")
 
-		// I use ExitOnError, so the error return from Parse() is unreachable
-		fooCmd.Parse(args[1:])                         //nolint:errcheck
-		fmt.Fprintln(stdout, "subcommand 'foo'")       //nolint:errcheck
-		fmt.Fprintln(stdout, "  enable:", *fooEnable)  //nolint:errcheck
-		fmt.Fprintln(stdout, "  name:", *fooName)      //nolint:errcheck
-		fmt.Fprintln(stdout, "  tail:", fooCmd.Args()) //nolint:errcheck
+		if err := fooCmd.Parse(args[1:]); err != nil {
+			fmt.Fprintln(stdout, "error:", err) //nolint:errcheck,gosec
+			return 1
+		}
+		fmt.Fprintln(stdout, "subcommand 'foo'")       //nolint:errcheck,gosec
+		fmt.Fprintln(stdout, "  enable:", *fooEnable)  //nolint:errcheck,gosec
+		fmt.Fprintln(stdout, "  name:", *fooName)      //nolint:errcheck,gosec
+		fmt.Fprintln(stdout, "  tail:", fooCmd.Args()) //nolint:errcheck,gosec
 
 	case "bar":
 		barCmd := flag.NewFlagSet("bar", flag.ExitOnError)
 		barLevel := barCmd.Int("level", 0, "level")
 
-		// I use ExitOnError, so the error return from Parse() is unreachable
-		barCmd.Parse(args[1:])                         //nolint:errcheck
-		fmt.Fprintln(stdout, "subcommand 'bar'")       //nolint:errcheck
-		fmt.Fprintln(stdout, "  level:", *barLevel)    //nolint:errcheck
-		fmt.Fprintln(stdout, "  tail:", barCmd.Args()) //nolint:errcheck
+		if err := barCmd.Parse(args[1:]); err != nil {
+			fmt.Fprintln(stdout, "error:", err) //nolint:errcheck,gosec
+			return 1
+		}
+		fmt.Fprintln(stdout, "subcommand 'bar'")       //nolint:errcheck,gosec
+		fmt.Fprintln(stdout, "  level:", *barLevel)    //nolint:errcheck,gosec
+		fmt.Fprintln(stdout, "  tail:", barCmd.Args()) //nolint:errcheck,gosec
 
 	//  sbox home -v --role user
 	case "home":
@@ -58,21 +62,24 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 		role := homeCmd.String("role", "user", "user or admin")
 		verbose := homeCmd.Bool("v", false, "verbose output")
 		useHTTP := homeCmd.Bool("http", false, "use HTTP instead of gRPC")
-		homeCmd.Parse(args[1:]) //nolint:errcheck
+		if err := homeCmd.Parse(args[1:]); err != nil {
+			fmt.Fprintln(stdout, "error:", err) //nolint:errcheck,gosec
+			return 1
+		}
 
 		if *useHTTP {
 			if client == nil {
 				var err error
 				client, err = clientForRole(*role, "./cmd/tls/ca-cert.pem", "./cmd/tls")
 				if err != nil {
-					fmt.Fprintln(stdout, "error:", err) //nolint:errcheck
+					fmt.Fprintln(stdout, "error:", err) //nolint:errcheck,gosec
 					return 1
 				}
 			}
 
 			resp, err := makeRequest(context.Background(), client, "GET", *host+"/", nil)
 			if err != nil {
-				fmt.Fprintln(stdout, "error", err) //nolint:errcheck
+				fmt.Fprintln(stdout, "error", err) //nolint:errcheck,gosec
 				return 1
 			}
 			printResponse(resp, *verbose, stdout)
@@ -80,19 +87,19 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 			// do your grpc thing
 			conn, err := grpcConnForRole(*role, "./cmd/tls/ca-cert.pem", "./cmd/tls", *grpcHost)
 			if err != nil {
-				fmt.Fprintln(stdout, "error:", err) //nolint:errcheck
+				fmt.Fprintln(stdout, "error:", err) //nolint:errcheck,gosec
 				return 1
 			}
-			defer conn.Close() //nolint:errcheck
+			defer conn.Close() //nolint:errcheck,gosec
 
 			c := pb.NewSnippetBoxClient(conn)
 			resp, err := c.Home(context.Background(), &pb.HomeRequest{})
 			if err != nil {
-				fmt.Fprintln(stdout, "error:", err) //nolint:errcheck
+				fmt.Fprintln(stdout, "error:", err) //nolint:errcheck,gosec
 				return 1
 			}
 
-			fmt.Fprintln(stdout, resp.Message) //nolint:errcheck
+			fmt.Fprintln(stdout, resp.Message) //nolint:errcheck,gosec
 		}
 
 	//  sbox view --id 1 --role admin
@@ -103,7 +110,10 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 		role := viewCmd.String("role", "user", "user or admin")
 		verbose := viewCmd.Bool("v", false, "verbose output")
 
-		viewCmd.Parse(args[1:]) //nolint:errcheck
+		if err := viewCmd.Parse(args[1:]); err != nil {
+			fmt.Fprintln(stdout, "error:", err) //nolint:errcheck,gosec
+			return 1
+		}
 
 		// The flag methods (String, Int, Bool) return pointers
 		//   because the values don't exist yet at declaration time —
@@ -117,7 +127,7 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 			var err error
 			client, err = clientForRole(*role, "./cmd/tls/ca-cert.pem", "./cmd/tls")
 			if err != nil {
-				fmt.Fprintln(stdout, "error:", err) //nolint:errcheck
+				fmt.Fprintln(stdout, "error:", err) //nolint:errcheck,gosec
 				return 1
 			}
 		}
@@ -126,7 +136,7 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 		resp, err := makeRequest(context.Background(), client, "GET",
 			fmt.Sprintf("%s/snippet/view/%d", *host, *id), nil)
 		if err != nil {
-			fmt.Fprintln(stdout, "error", err) //nolint:errcheck
+			fmt.Fprintln(stdout, "error", err) //nolint:errcheck,gosec
 			return 1
 		}
 		printResponse(resp, *verbose, stdout)
@@ -140,13 +150,16 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 		role := createCmd.String("role", "admin", "user or admin")
 		verbose := createCmd.Bool("v", false, "verbose output")
 
-		createCmd.Parse(args[1:]) //nolint:errcheck
+		if err := createCmd.Parse(args[1:]); err != nil {
+			fmt.Fprintln(stdout, "error:", err) //nolint:errcheck,gosec
+			return 1
+		}
 
 		if client == nil {
 			var err error
 			client, err = clientForRole(*role, "./cmd/tls/ca-cert.pem", "./cmd/tls")
 			if err != nil {
-				fmt.Fprintln(stdout, "error:", err) //nolint:errcheck
+				fmt.Fprintln(stdout, "error:", err) //nolint:errcheck,gosec
 				return 1
 			}
 		}
@@ -159,12 +172,12 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 
 		payload, err := json.Marshal(data)
 		if err != nil {
-			fmt.Fprintln(stdout, "error:", err) //nolint:errcheck
+			fmt.Fprintln(stdout, "error:", err) //nolint:errcheck,gosec
 			return 1
 		}
 		resp, err := makeRequest(context.Background(), client, "POST", *host+"/snippet/create", bytes.NewReader(payload))
 		if err != nil {
-			fmt.Fprintln(stdout, "error", err) //nolint:errcheck
+			fmt.Fprintln(stdout, "error", err) //nolint:errcheck,gosec
 			return 1
 		}
 
@@ -172,7 +185,7 @@ func run(args []string, stdout io.Writer, client *http.Client) int {
 
 	// wrong args
 	default:
-		fmt.Fprintln(stdout, "expected 'foo' or 'bar' or 'home' or 'view' or 'create' subcommands") //nolint:errcheck
+		fmt.Fprintln(stdout, "expected 'foo' or 'bar' or 'home' or 'view' or 'create' subcommands") //nolint:errcheck,gosec
 		return 1
 	}
 	return 0

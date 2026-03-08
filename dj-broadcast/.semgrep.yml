@@ -62,3 +62,85 @@ rules:
       Appending in a loop without bounds checking may cause unbounded memory growth.
     languages: [go]
     severity: INFO
+
+  - id: defer-channel-send
+    pattern: |
+        defer func() {
+          ...
+          $CH <- $VAL
+          ...
+        }()
+    paths:
+      exclude:
+        - "*_test.go"
+    message: >
+      Defer block sends on a channel. If the receiver is already gone
+      when this defer runs, it will block forever (goroutine leak) or
+      panic on a closed channel.
+    languages: [go]
+    severity: WARNING
+
+  - id: wg-add-inside-goroutine
+    pattern: |
+        go func(...) {
+          ...
+          $WG.Add(...)
+          ...
+        }(...)
+    paths:
+      exclude:
+        - "*_test.go"
+    message: >
+      wg.Add() called inside a goroutine creates a race with wg.Wait().
+      Always call wg.Add() before launching the goroutine.
+    languages: [go]
+    severity: ERROR
+
+  - id: closeable-type-inventory
+    pattern-either:
+      - pattern: |
+          func ($R $TYPE) Close() { ... }
+      - pattern: |
+          func ($R $TYPE) Close() error { ... }
+      - pattern: |
+          func ($R $TYPE) Stop() { ... }
+      - pattern: |
+          func ($R $TYPE) Stop() error { ... }
+      - pattern: |
+          func ($R $TYPE) Shutdown() { ... }
+      - pattern: |
+          func ($R $TYPE) Shutdown(...) error { ... }
+    paths:
+      exclude:
+        - "*_test.go"
+    message: >
+      Type has a Close/Stop/Shutdown method. LLM should verify all public
+      methods handle the closed state safely.
+    languages: [go]
+    severity: INFO
+
+  - id: channel-make-inventory
+    pattern-either:
+      - pattern: make(chan $T)
+      - pattern: make(chan $T, $N)
+    paths:
+      exclude:
+        - "*_test.go"
+    message: >
+      Channel creation site. LLM should verify producer/consumer lifecycle
+      and check for deadlock or send-after-close.
+    languages: [go]
+    severity: INFO
+
+  - id: mutex-lock-inventory
+    pattern-either:
+      - pattern: $MU.Lock()
+      - pattern: $MU.RLock()
+    paths:
+      exclude:
+        - "*_test.go"
+    message: >
+      Mutex lock site. If multiple locks exist on the same type, LLM should
+      verify consistent acquisition ordering.
+    languages: [go]
+    severity: INFO

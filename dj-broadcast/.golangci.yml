@@ -11,6 +11,8 @@ linters:
     - gocritic
     - bodyclose
     - noctx
+    - gosec
+    - contextcheck
   settings:
     govet:
       enable:
@@ -33,3 +35,6 @@ linters:
         linters:
           - noctx
           - errcheck
+          - gosec
+          - contextcheck
+          - bodyclose

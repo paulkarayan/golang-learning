@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -21,7 +22,7 @@ func makeRequest(ctx context.Context, client *http.Client, method, url string, b
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	return client.Do(req)
+	return client.Do(req) //nolint:gosec // URL from CLI flags, not user input
 }
 
 // verbose helper extracted from main.go
@@ -48,7 +49,7 @@ func clientForRole(role, caPath, certDir string) (*http.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	caCert, err := os.ReadFile(caPath)
+	caCert, err := os.ReadFile(filepath.Clean(caPath))
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +75,7 @@ func grpcConnForRole(role, caPath, certDir, grpcHost string) (*grpc.ClientConn, 
 	if err != nil {
 		return nil, err
 	}
-	caCert, err := os.ReadFile(caPath)
+	caCert, err := os.ReadFile(filepath.Clean(caPath))
 	if err != nil {
 		return nil, err
 	}
