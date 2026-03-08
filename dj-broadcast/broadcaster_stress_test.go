@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"sync"
@@ -10,9 +11,9 @@ import (
 	"time"
 )
 
-// Catches TOCTOU between Get and Subscribe — if Stop runs between
-// sm.Get() returning and b.Subscribe() being called, Subscribe blocks forever
-func TestRace_GetSubscribeVsStop(t *testing.T) {
+// Catches TOCTOU between Get and Read — if Stop runs between
+// sm.Get() returning and b.Read() being called, Read should not block forever
+func TestRace_GetReadVsStop(t *testing.T) {
 	const iterations = 500
 	const timeout = 100 * time.Millisecond
 
@@ -34,7 +35,8 @@ func TestRace_GetSubscribeVsStop(t *testing.T) {
 			done := make(chan struct{})
 			go func() {
 				defer close(done)
-				b.Subscribe()
+				cursor := 0
+				b.Read(context.Background(), &cursor)
 			}()
 
 			select {
@@ -55,13 +57,13 @@ func TestRace_GetSubscribeVsStop(t *testing.T) {
 
 		select {
 		case <-blocked:
-			t.Fatal("Subscribe blocked after Stop — TOCTOU bug detected")
+			t.Fatal("Read blocked after Stop — TOCTOU bug detected")
 		default:
 		}
 	}
 }
 
-// Catches double-close panic — calling Close() concurrently from multiple goroutines
+// Probes double-close panic — calling Close() concurrently from multiple goroutines
 func TestRace_DoubleClose(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		b := NewBroadcaster()
@@ -90,13 +92,19 @@ func TestRace_DoubleClose(t *testing.T) {
 	}
 }
 
-// Catches goroutine leaks from slow subscribers that never read
-// goleak in TestMain will flag any leaked goroutines
-func TestLeak_SlowSubscriber(t *testing.T) {
+// probes goroutine leaks from slow readers that never consume
+func TestLeak_SlowReader(t *testing.T) {
 	b := NewBroadcaster()
 
+	var wg sync.WaitGroup
 	for i := 0; i < 100; i++ {
-		b.Subscribe()
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			cursor := 0
+			// read once then abandon — simulates slow/disconnected client
+			b.Read(context.Background(), &cursor)
+		}()
 	}
 
 	for i := 0; i < 1000; i++ {
@@ -104,21 +112,143 @@ func TestLeak_SlowSubscriber(t *testing.T) {
 	}
 
 	b.Close()
+	wg.Wait()
 }
 
-// Catches panic when Close() races with in-flight Send/Subscribe
+// All blocked readers must wake up when Close is called
+// there should be no deadlocks observed
+func TestStress_CloseWakesAllReaders(t *testing.T) {
+	for i := 0; i < 100; i++ {
+		b := NewBroadcaster()
+		var wg sync.WaitGroup
+
+		for j := 0; j < 50; j++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				cursor := 0
+				b.Read(context.Background(), &cursor)
+			}()
+		}
+
+		time.Sleep(10 * time.Millisecond)
+		b.Close()
+
+		done := make(chan struct{})
+		go func() {
+			wg.Wait()
+			close(done)
+		}()
+
+		select {
+		case <-done:
+		case <-time.After(time.Second):
+			t.Fatal("not all readers woke up after Close")
+		}
+	}
+}
+
+// Concurrent readers and writers don't deadlock under load
+func TestStress_ConcurrentReadWrite(t *testing.T) {
+	b := NewBroadcaster()
+
+	var wg sync.WaitGroup
+
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 100; j++ {
+				b.Send([]byte("data"))
+			}
+		}()
+	}
+
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			cursor := 0
+			for {
+				_, ok := b.Read(context.Background(), &cursor)
+				if !ok {
+					return
+				}
+			}
+		}()
+	}
+
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		b.Close()
+	}()
+
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("deadlock: concurrent read/write didn't complete")
+	}
+}
+
+// Rapid connect/disconnect under load doesn't leak goroutines
+func TestStress_RapidConnectDisconnect(t *testing.T) {
+	b := NewBroadcaster()
+	defer b.Close()
+
+	go func() {
+		for i := 0; i < 10000; i++ {
+			b.Send([]byte("data"))
+			time.Sleep(time.Microsecond)
+		}
+	}()
+
+	var wg sync.WaitGroup
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ctx, cancel := context.WithTimeout(
+				context.Background(),
+				time.Duration(rand.Intn(10))*time.Millisecond,
+			)
+			defer cancel()
+
+			go func() {
+				<-ctx.Done()
+				b.cond.Broadcast()
+			}()
+
+			cursor := 0
+			for {
+				_, ok := b.Read(ctx, &cursor)
+				if !ok {
+					return
+				}
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+// Catches panic when Close() races with in-flight Send/Read
 func TestRace_ConcurrentOpsVsClose(t *testing.T) {
 	for i := 0; i < 200; i++ {
 		b := NewBroadcaster()
 		var wg sync.WaitGroup
 
-		// subscribers
+		// readers
 		for j := 0; j < 5; j++ {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				defer func() { recover() }()
-				b.Subscribe()
+				cursor := 0
+				b.Read(context.Background(), &cursor)
 			}()
 		}
 
@@ -127,7 +257,6 @@ func TestRace_ConcurrentOpsVsClose(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				defer func() { recover() }()
 				b.Send([]byte("msg"))
 			}()
 		}
