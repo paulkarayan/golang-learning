@@ -1,0 +1,41 @@
+{
+  "check": "check-channels",
+  "project_dir": "/Users/pk/go-teleport-go",
+  "run_at": "2026-03-14T10:50:59.908518-07:00",
+  "duration_ms": 32724,
+  "item_count": 1,
+  "items": [
+    {
+      "id": "chan_1",
+      "name": "drained",
+      "file": "jobworker/output_buffer.go",
+      "line": 30,
+      "element_type": "struct{...}",
+      "buffered": false,
+      "buffer_size": "",
+      "senders": null,
+      "receivers": [
+        {
+          "file": "jobworker/manager.go",
+          "line": 170,
+          "context": "JobManager.Output"
+        },
+        {
+          "file": "jobworker/output_buffer.go",
+          "line": 70,
+          "context": "OutputBufferReader.Read"
+        }
+      ],
+      "closers": [
+        {
+          "file": "jobworker/output_buffer.go",
+          "line": 72,
+          "context": "OutputBufferReader.Read"
+        }
+      ],
+      "close_owner": "",
+      "hazards": null,
+      "source_context": "// function: OutputBuffer.NewReader\n// jobworker/output_buffer.go:29-31\n  29 | func (ob *OutputBuffer) NewReader() *OutputBufferReader {\n  30 | \treturn \u0026OutputBufferReader{ob: ob, drained: make(chan struct{})}\n  31 | }\n"
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "check": "check-channels",
+  "project_dir": "/Users/pk/go-teleport-go",
+  "run_at": "2026-03-14T10:58:38.661817-07:00",
+  "duration_ms": 79752,
+  "item_count": 1,
+  "items": [
+    {
+      "id": "chan_1",
+      "name": "drained",
+      "file": "jobworker/output_buffer.go",
+      "line": 30,
+      "element_type": "struct{...}",
+      "buffered": false,
+      "buffer_size": "",
+      "senders": null,
+      "receivers": [
+        {
+          "file": "jobworker/manager.go",
+          "line": 170,
+          "context": "JobManager.Output"
+        },
+        {
+          "file": "jobworker/output_buffer.go",
+          "line": 70,
+          "context": "OutputBufferReader.Read"
+        }
+      ],
+      "closers": [
+        {
+          "file": "jobworker/output_buffer.go",
+          "line": 72,
+          "context": "OutputBufferReader.Read"
+        }
+      ],
+      "close_owner": "OutputBufferReader.Read (output_buffer.go:72) — correct, as Read is the sole producer of the drained signal and has the only close site",
+      "hazards": [
+        {
+          "kind": "unbuffered_deadlock",
+          "severity": "BUG",
+          "detail": "OutputBufferReader.Read both receives on 'drained' at line 70 and closes it at line 72 of the same function. If the receive at line 70 is on 'drained' itself (not a different channel), Read will block forever waiting for a close that only it can perform — a self-deadlock. manager.go:170 (JobManager.Output) is also blocked on the same channel, so both goroutines hang permanently. No external closer exists."
+        },
+        {
+          "kind": "no_close",
+          "severity": "WARNING",
+          "detail": "If Read exits early (panic, early return before line 72, or context cancellation), the close at line 72 is never reached. manager.go:170 blocks on \u003c-drained indefinitely. There is no defer-close or once.Do guard visible in the provided source, so any non-happy-path exit from Read leaks the goroutine in Output."
+        },
+        {
+          "kind": "double_close",
+          "severity": "WARNING",
+          "detail": "There is one close site, but no sync.Once or similar guard. If OutputBufferReader.Read is called concurrently by two goroutines (nothing in NewReader prevents sharing the same *OutputBufferReader), both may race to close(drained) at line 72, causing a runtime panic. Close ownership must be enforced with a sync.Once or a structural guarantee that Read is called at most once per reader instance."
+        }
+      ],
+      "llm_summary": "The 'drained' channel carries a self-referential risk: Read both receives on it (line 70) and is the sole closer (line 72), which deadlocks if the receive is on 'drained' itself; additionally, no once-close guard protects against concurrent or repeated calls to Read causing a double-close panic, and any early exit from Read will permanently block the waiting Output goroutine.",
+      "source_context": "// function: OutputBuffer.NewReader\n// jobworker/output_buffer.go:29-31\n  29 | func (ob *OutputBuffer) NewReader() *OutputBufferReader {\n  30 | \treturn \u0026OutputBufferReader{ob: ob, drained: make(chan struct{})}\n  31 | }\n"
+    }
+  ]
+}

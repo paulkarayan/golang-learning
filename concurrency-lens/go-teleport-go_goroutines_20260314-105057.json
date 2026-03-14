@@ -1,0 +1,75 @@
+{
+  "check": "check-goroutines",
+  "project_dir": "/Users/pk/go-teleport-go",
+  "run_at": "2026-03-14T10:50:57.430037-07:00",
+  "duration_ms": 12952,
+  "item_count": 5,
+  "items": [
+    {
+      "kind": "goroutine",
+      "id": "goroutine_1",
+      "file": "jobworker/manager.go",
+      "line": 66,
+      "spawn_context": "JobManager.Start",
+      "label": "wait",
+      "channels_read": null,
+      "channels_write": null,
+      "lifecycle": "one_shot",
+      "stop_mechanism": "none",
+      "leak_risk": "high",
+      "leak_reason": "No shutdown mechanism exists to drain wait goroutines on server exit; the TODO comment explicitly acknowledges goroutines leak until OS cleanup.",
+      "llm_summary": "One goroutine is spawned per job and runs until the child process exits, but with no WaitGroup or context to drain them on shutdown, all in-flight goroutines (and their job references) leak when the server stops.",
+      "source_snippet": "// jobworker/manager.go:31-70\n  31 | func (jm *JobManager) Start(command string, owner string, args ...string) (string, error) {\n  32 | \n  33 | \tid := generateID()\n  34 | \n  35 | \tcmd := exec.Command(command, args...) //nolint:gosec // arbitrary command running is by design\n  36 | \tob := NewOutputBuffer()\n  37 | \tcmd.Stderr = ob\n  38 | \tcmd.Stdout = ob\n  39 | \n  40 | \t// if it doesnt start we dont have an id to return\n  41 | \tif err := cmd.Start(); err != nil {\n  42 | \t\tlog.Printf(\"Start: failed to start job with command %s: %v\", command, err)\n  43 | \t\treturn \"\", err\n  44 | \t}\n  45 | \n  46 | \tjob := \u0026Job{\n  47 | \t\tInfo: JobInfo{\n  48 | \t\t\tID:     id,\n  49 | \t\t\tOwner:  owner,\n  50 | \t\t\tStatus: JobStatusRunning,\n  51 | \t\t},\n  52 | \t\tCmd:    cmd,\n  53 | \t\toutput: ob,\n  54 | \t}\n  55 | \n  56 | \t// lock to append the job's particulars and then unlock\n  57 | \tjm.mu.Lock()\n  58 | \tjm.jobs[id] = job\n  59 | \tjm.mu.Unlock()\n  60 | \n  61 | \t// spawn the Waiter\n  62 | \t// TODO: add a Shutdown() to drain wait goroutines on teardown.\n  63 | \t// without it, goroutines leak on server exit (until OS cleanup)\n  64 | \t// an implementation could be: track goroutines with a WaitGroup, kill all running jobs\n  65 | \t// and then call Wait()\n  66 | \tgo jm.wait(job)\n  67 | \n  68 | \treturn id, nil\n  69 | \n  70 | }\n"
+    },
+    {
+      "kind": "goroutine",
+      "id": "goroutine_2",
+      "file": "jobworker/manager.go",
+      "line": 167,
+      "spawn_context": "JobManager.Output",
+      "label": "JobManager.Output/anon#2",
+      "channels_read": [
+        "?",
+        "reader.drained"
+      ],
+      "channels_write": null,
+      "lifecycle": "per_request",
+      "stop_mechanism": "context|done_channel",
+      "leak_risk": "medium",
+      "leak_reason": "If the caller neither cancels the context nor reads the buffer to drain it, the goroutine blocks indefinitely; the comment documents this but does not enforce it.",
+      "llm_summary": "A per-request watcher goroutine that exits on whichever of context cancellation or buffer drain fires first, with a medium leak risk if the caller ignores both signals.",
+      "source_snippet": "// jobworker/manager.go:153-175\n 153 | func (jm *JobManager) Output(ctx context.Context, id string) (*OutputBufferReader, error) {\n 154 | \tjm.mu.RLock()\n 155 | \tjob, ok := jm.jobs[id]\n 156 | \tjm.mu.RUnlock()\n 157 | \n 158 | \tif !ok {\n 159 | \t\treturn nil, fmt.Errorf(\"%w: %s\", ErrJobNotFound, id)\n 160 | \t}\n 161 | \n 162 | \treader := job.output.NewReader()\n 163 | \n 164 | \t// Watcher goroutine exits when the client disconnects (closing the reader) OR buffer drains\n 165 | \t// whichever signal comes first, close the reader\n 166 | \t// Caller must either call Read() or cancel context to avoid a leak.\n 167 | \tgo func() {\n 168 | \t\tselect {\n 169 | \t\tcase \u003c-ctx.Done():\n 170 | \t\tcase \u003c-reader.drained:\n 171 | \t\t}\n 172 | \t\treader.Close()\n 173 | \t}()\n 174 | \treturn reader, nil\n 175 | }\n"
+    },
+    {
+      "kind": "channel",
+      "id": "channel_1",
+      "name": "ch_1",
+      "file": "jobworker/output_buffer.go",
+      "line": 30,
+      "element_type": "struct{...}",
+      "buffered": false,
+      "buffer_size": "",
+      "senders": null,
+      "receivers": null,
+      "closers": null
+    },
+    {
+      "kind": "edge",
+      "from": "?",
+      "to": "goroutine_2",
+      "via": "?",
+      "direction": "receives",
+      "file": "jobworker/manager.go",
+      "line": 169
+    },
+    {
+      "kind": "edge",
+      "from": "?",
+      "to": "goroutine_2",
+      "via": "reader.drained",
+      "direction": "receives",
+      "file": "jobworker/manager.go",
+      "line": 170
+    }
+  ]
+}

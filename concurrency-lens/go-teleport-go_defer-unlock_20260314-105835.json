@@ -1,0 +1,8 @@
+{
+  "check": "check-defer-unlock",
+  "project_dir": "/Users/pk/go-teleport-go",
+  "run_at": "2026-03-14T10:58:35.157083-07:00",
+  "duration_ms": 3,
+  "item_count": 0,
+  "items": []
+}

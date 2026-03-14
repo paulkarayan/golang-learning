@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>concurrency-lens</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spin { display: inline-block; animation: spin 1s linear infinite; }
+    .row-expand { cursor: pointer; }
+    .row-expand:hover { background-color: #f9fafb; }
+    pre { white-space: pre-wrap; word-break: break-all; }
+    th.sortable { cursor: pointer; user-select: none; }
+    th.sortable:hover { background-color: #f3f4f6; }
+  </style>
+</head>
+<body class="bg-gray-50 text-sm text-gray-900 h-screen flex flex-col">
+
+  <!-- header -->
+  <header class="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-4 flex-shrink-0">
+    <span class="font-semibold text-gray-800 tracking-tight">concurrency-lens</span>
+    <div class="flex items-center gap-2 flex-1 max-w-xl">
+      <span class="text-gray-500 text-xs whitespace-nowrap">Project dir</span>
+      <input id="projectDirInput" type="text" placeholder="/path/to/your/project"
+        class="flex-1 border border-gray-300 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-blue-400"
+        onchange="state.projectDir = this.value; renderSidebar()">
+    </div>
+  </header>
+
+  <!-- body -->
+  <div class="flex flex-1 overflow-hidden">
+
+    <!-- sidebar -->
+    <nav class="w-56 bg-white border-r border-gray-200 flex-shrink-0 flex flex-col overflow-y-auto">
+      <div id="sidebar" class="flex-1 py-2"></div>
+    </nav>
+
+    <!-- main -->
+    <main id="main" class="flex-1 overflow-y-auto p-6">
+      <div class="text-gray-400 text-center mt-32">
+        Select a check from the sidebar.
+      </div>
+    </main>
+
+  </div>
+
+<script>
+// ─── state ────────────────────────────────────────────────────────────────────
+
+const state = {
+  projectDir: '',
+  selectedCheck: null,
+  // per check: { status: 'not_run'|'running'|'done'|'error', result: null, runId: null, error: null }
+  checks: {},
+  // per check: { sortCol, sortDir, filter, statusFilter, expanded: Set }
+  tableState: {},
+}
+
+// ─── check metadata ───────────────────────────────────────────────────────────
+
+const CHECKS = {
+  'check-closure': {
+    name: 'Closure Capture',
+    group: 'Mechanical',
+    description: 'Goroutines that close over loop variables without passing them as arguments. Classic data race.',
+    columns: [
+      { key: 'file',          label: 'File',     sortable: true },
+      { key: 'line',          label: 'Line',     sortable: true },
+      { key: 'var_name',      label: 'Variable', sortable: true },
+      { key: 'loop_kind',     label: 'Loop',     sortable: true },
+      { key: 'severity',      label: 'Severity', sortable: true, badge: 'severity' },
+    ],
+    expandKeys: ['func_context', 'issue', 'snippet'],
+    statusKey: 'severity',
+    defaultSort: 'severity',
+  },
+  'check-maps': {
+    name: 'Concurrent Maps',
+    group: 'Mechanical',
+    description: 'Maps written inside goroutines without synchronisation.',
+    columns: [
+      { key: 'file',        label: 'File',       sortable: true },
+      { key: 'line',        label: 'Line',       sortable: true },
+      { key: 'map_name',    label: 'Map',        sortable: true },
+      { key: 'write_op',    label: 'Op',         sortable: true },
+      { key: 'protection',  label: 'Protection', sortable: true },
+      { key: 'severity',    label: 'Severity',   sortable: true, badge: 'severity' },
+    ],
+    expandKeys: ['declared_scope', 'declared_file', 'declared_line', 'goroutine_line', 'issue', 'snippet'],
+    statusKey: 'severity',
+    defaultSort: 'severity',
+  },
+  'check-wg': {
+    name: 'WaitGroup Misuse',
+    group: 'Mechanical',
+    description: 'WaitGroup.Add() called inside the goroutine body — races with wg.Wait().',
+    columns: [
+      { key: 'file',         label: 'File',       sortable: true },
+      { key: 'line',         label: 'Line',       sortable: true },
+      { key: 'wg_name',      label: 'WaitGroup',  sortable: true },
+      { key: 'go_stmt_line', label: 'Go Stmt',    sortable: true },
+      { key: 'severity',     label: 'Severity',   sortable: true, badge: 'severity' },
+    ],
+    expandKeys: ['func_context', 'issue', 'snippet'],
+    statusKey: 'severity',
+    defaultSort: 'severity',
+  },
+  'check-defer-unlock': {
+    name: 'Defer Unlock in Loop',
+    group: 'Mechanical',
+    description: 'defer mu.Unlock() inside a for loop holds the lock until the function returns.',
+    columns: [
+      { key: 'file',        label: 'File',      sortable: true },
+      { key: 'line',        label: 'Line',      sortable: true },
+      { key: 'mutex_name',  label: 'Mutex',     sortable: true },
+      { key: 'unlock_kind', label: 'Kind',      sortable: true },
+      { key: 'loop_line',   label: 'Loop Line', sortable: true },
+      { key: 'severity',    label: 'Severity',  sortable: true, badge: 'severity' },
+    ],
+    expandKeys: ['func_context', 'loop_kind', 'issue', 'snippet'],
+    statusKey: 'severity',
+    defaultSort: 'severity',
+  },
+  'check-ownership': {
+    name: 'Variable Ownership',
+    group: 'LLM Enhanced',
+    description: 'Every struct field and package var: who owns it, what protects it, is it safe?',
+    columns: [
+      { key: 'name',        label: 'Name',       sortable: true },
+      { key: 'kind',        label: 'Kind',       sortable: true },
+      { key: 'type_str',    label: 'Type',       sortable: true },
+      { key: 'protection',  label: 'Protection', sortable: true },
+      { key: 'status',      label: 'Status',     sortable: true, badge: 'status' },
+    ],
+    expandKeys: ['owner', 'access_pattern', 'comment_claim', 'status_reason', 'file', 'line'],
+    statusKey: 'status',
+    defaultSort: 'status',
+  },
+  'check-goroutines': {
+    name: 'Goroutine Graph',
+    group: 'LLM Enhanced',
+    description: 'Lifecycle and leak risk for every spawned goroutine.',
+    columns: [
+      { key: 'label',          label: 'Label',      sortable: true },
+      { key: 'file',           label: 'File',       sortable: true },
+      { key: 'line',           label: 'Line',       sortable: true },
+      { key: 'lifecycle',      label: 'Lifecycle',  sortable: true },
+      { key: 'stop_mechanism', label: 'Stop Via',   sortable: true },
+      { key: 'leak_risk',      label: 'Leak Risk',  sortable: true, badge: 'leak_risk' },
+    ],
+    expandKeys: ['spawn_context', 'channels_read', 'channels_write', 'llm_summary', 'leak_reason'],
+    statusKey: 'leak_risk',
+    defaultSort: 'leak_risk',
+    multiTable: true, // goroutines check needs two tables
+  },
+  'check-channels': {
+    name: 'Channel Lifecycle',
+    group: 'LLM Enhanced',
+    description: 'Send-after-close, deadlock, and buffer saturation per channel.',
+    columns: [
+      { key: 'name',         label: 'Name',      sortable: true },
+      { key: 'file',         label: 'File',      sortable: true },
+      { key: 'element_type', label: 'Type',      sortable: true },
+      { key: 'buffered',     label: 'Buffered',  sortable: true },
+      { key: '_hazard_count', label: 'Hazards',  sortable: true, badge: 'hazard_count' },
+    ],
+    expandKeys: ['close_owner', 'llm_summary', '_senders', '_receivers', '_closers', '_hazards'],
+    statusKey: '_hazard_count',
+    defaultSort: '_hazard_count',
+  },
+  'check-locks': {
+    name: 'Lock Ordering',
+    group: 'LLM Enhanced',
+    description: 'Functions acquiring the same mutexes in conflicting orders.',
+    columns: [
+      { key: 'func_a',       label: 'Function A',   sortable: true },
+      { key: 'func_b',       label: 'Function B',   sortable: true },
+      { key: '_shared',      label: 'Shared Locks', sortable: false },
+      { key: 'hazard',       label: 'Hazard',       sortable: true, badge: 'hazard' },
+      { key: 'severity',     label: 'Severity',     sortable: true, badge: 'severity' },
+    ],
+    expandKeys: ['_locks_a', '_locks_b', 'llm_detail'],
+    statusKey: 'hazard',
+    defaultSort: 'severity',
+  },
+}
+
+// ─── badge rendering ──────────────────────────────────────────────────────────
+
+function badgeClass(type, value) {
+  const red    = 'bg-red-100 text-red-700 border border-red-200'
+  const yellow = 'bg-yellow-100 text-yellow-700 border border-yellow-200'
+  const green  = 'bg-green-100 text-green-700 border border-green-200'
+  const blue   = 'bg-blue-100 text-blue-700 border border-blue-200'
+  const gray   = 'bg-gray-100 text-gray-600 border border-gray-200'
+
+  if (type === 'severity') {
+    if (value === 'BUG')     return red
+    if (value === 'WARNING') return yellow
+    if (value === 'INFO')    return blue
+  }
+  if (type === 'status') {
+    if (value === 'red')    return red
+    if (value === 'yellow') return yellow
+    if (value === 'green')  return green
+  }
+  if (type === 'leak_risk') {
+    if (value === 'high')   return red
+    if (value === 'medium') return yellow
+    if (value === 'low')    return green
+  }
+  if (type === 'hazard') {
+    if (value === 'deadlock')           return red
+    if (value === 'potential_deadlock') return yellow
+    if (value === 'none')               return green
+  }
+  if (type === 'hazard_count') {
+    const n = parseInt(value) || 0
+    if (n > 0) return red
+    return green
+  }
+  return gray
+}
+
+function badge(type, value) {
+  if (value === null || value === undefined || value === '') return '—'
+  const cls = badgeClass(type, String(value))
+  return `<span class="inline-block px-1.5 py-0.5 rounded text-xs font-medium ${cls}">${escHtml(String(value))}</span>`
+}
+
+// ─── sidebar ──────────────────────────────────────────────────────────────────
+
+function sidebarStatus(checkId) {
+  const cs = state.checks[checkId]
+  if (!cs) return 'not_run'
+  return cs.status
+}
+
+function sidebarBadgeHTML(checkId) {
+  const cs = state.checks[checkId]
+  if (!cs || cs.status === 'not_run') {
+    return '<span class="w-2 h-2 rounded-full bg-gray-300 inline-block"></span>'
+  }
+  if (cs.status === 'running') {
+    return '<span class="spin text-blue-500 text-xs">↻</span>'
+  }
+  if (cs.status === 'error') {
+    return '<span class="w-2 h-2 rounded-full bg-red-500 inline-block" title="Error"></span>'
+  }
+  if (cs.status === 'done' && cs.result) {
+    const counts = getIssueCounts(checkId, cs.result.items || [])
+    if (counts.bugs > 0) {
+      return `<span class="text-xs font-medium text-red-600">${counts.bugs}</span>`
+    }
+    if (counts.warnings > 0) {
+      return `<span class="text-xs font-medium text-yellow-600">${counts.warnings}</span>`
+    }
+    return '<span class="text-green-500 text-xs">✓</span>'
+  }
+  return ''
+}
+
+function getIssueCounts(checkId, items) {
+  const meta = CHECKS[checkId]
+  if (!meta) return { bugs: 0, warnings: 0 }
+  let bugs = 0, warnings = 0
+  for (const item of items) {
+    const enriched = enrichItem(checkId, item)
+    const key = meta.statusKey
+    const val = enriched[key]
+    if (!val) continue
+    const cls = badgeClass(meta.columns.find(c => c.key === key)?.badge || key, String(val))
+    if (cls.includes('red-'))    bugs++
+    else if (cls.includes('yellow-')) warnings++
+  }
+  return { bugs, warnings }
+}
+
+function renderSidebar() {
+  const groups = {}
+  for (const [id, meta] of Object.entries(CHECKS)) {
+    if (!groups[meta.group]) groups[meta.group] = []
+    groups[meta.group].push({ id, meta })
+  }
+
+  let html = ''
+  for (const [group, checks] of Object.entries(groups)) {
+    html += `<div class="px-3 pt-4 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">${escHtml(group)}</div>`
+    for (const { id, meta } of checks) {
+      const active = state.selectedCheck === id
+      const bg = active ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+      html += `
+        <button onclick="selectCheck('${id}')"
+          class="w-full text-left flex items-center justify-between px-3 py-1.5 ${bg} rounded-sm">
+          <span class="truncate">${escHtml(meta.name)}</span>
+          <span class="flex-shrink-0 ml-2">${sidebarBadgeHTML(id)}</span>
+        </button>`
+    }
+  }
+  document.getElementById('sidebar').innerHTML = html
+}
+
+// ─── main panel ───────────────────────────────────────────────────────────────
+
+function renderMain() {
+  const checkId = state.selectedCheck
+  if (!checkId) {
+    document.getElementById('main').innerHTML =
+      '<div class="text-gray-400 text-center mt-32">Select a check from the sidebar.</div>'
+    return
+  }
+
+  const meta = CHECKS[checkId]
+  const cs = state.checks[checkId] || { status: 'not_run' }
+
+  let bodyHTML = ''
+
+  if (cs.status === 'not_run' || !cs) {
+    bodyHTML = renderNotRun(checkId, meta)
+  } else if (cs.status === 'running') {
+    bodyHTML = renderRunning(meta)
+  } else if (cs.status === 'done') {
+    bodyHTML = renderResults(checkId, meta, cs.result)
+  } else if (cs.status === 'error') {
+    bodyHTML = renderError(meta, cs.error)
+  }
+
+  document.getElementById('main').innerHTML = `
+    <div class="max-w-5xl mx-auto">
+      <h1 class="text-lg font-semibold text-gray-900 mb-1">${escHtml(meta.name)}</h1>
+      <p class="text-gray-500 mb-6">${escHtml(meta.description)}</p>
+      ${bodyHTML}
+    </div>`
+}
+
+function renderNotRun(checkId, meta) {
+  const isLLM = meta.group === 'LLM Enhanced'
+  return `
+    <div class="border border-gray-200 rounded-lg bg-white p-10 text-center">
+      <div class="text-3xl mb-3 text-gray-300">○</div>
+      <p class="text-gray-500 mb-5">This check hasn't been run yet.</p>
+      <button onclick="runCheck('${checkId}')"
+        class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded font-medium">
+        ▶ Run check
+      </button>
+      ${isLLM ? '<p class="text-xs text-gray-400 mt-3">Requires <code>claude</code> CLI and <code>ANTHROPIC_API_KEY</code>.</p>' : ''}
+    </div>`
+}
+
+function renderRunning(meta) {
+  return `
+    <div class="border border-gray-200 rounded-lg bg-white p-10 text-center">
+      <div class="spin text-blue-500 text-2xl mb-3">↻</div>
+      <p class="text-gray-500">Running…</p>
+    </div>`
+}
+
+function renderError(meta, errMsg) {
+  return `
+    <div class="border border-red-200 rounded-lg bg-red-50 p-6">
+      <p class="font-medium text-red-700 mb-1">Check failed</p>
+      <p class="text-red-600 text-xs font-mono">${escHtml(errMsg || 'unknown error')}</p>
+    </div>`
+}
+
+function renderResults(checkId, meta, result) {
+  if (!result) return '<p class="text-gray-400">No result data.</p>'
+
+  const items = result.items || []
+  const ts = result.run_at ? new Date(result.run_at).toLocaleString() : ''
+  const outFile = result.output_file || ''
+
+  let header = `
+    <div class="flex items-center justify-between mb-4 text-xs text-gray-500">
+      <span>${items.length} item${items.length !== 1 ? 's' : ''}${ts ? ' · ' + ts : ''}</span>
+      ${outFile ? `<span class="font-mono truncate max-w-xs" title="${escHtml(outFile)}">${escHtml(outFile)}</span>` : ''}
+    </div>`
+
+  if (items.length === 0) {
+    return header + `
+      <div class="border border-green-200 rounded-lg bg-green-50 p-8 text-center text-green-700">
+        ✓ No issues found.
+      </div>`
+  }
+
+  if (meta.multiTable) {
+    return header + renderGoroutineTables(checkId, items)
+  }
+
+  return header + renderFilteredTable(checkId, meta, items)
+}
+
+// ─── goroutines multi-table ───────────────────────────────────────────────────
+
+function renderGoroutineTables(checkId, items) {
+  const goroutines = items.filter(i => i.kind === 'goroutine')
+  const edges      = items.filter(i => i.kind === 'edge')
+  const channels   = items.filter(i => i.kind === 'channel')
+
+  const meta = CHECKS[checkId]
+  let html = ''
+
+  if (goroutines.length) {
+    html += `<h3 class="font-medium text-gray-700 mb-2">Goroutines (${goroutines.length})</h3>`
+    html += renderFilteredTable(checkId, meta, goroutines)
+  }
+
+  if (edges.length) {
+    const edgeCols = [
+      { key: 'from', label: 'From', sortable: true },
+      { key: 'to',   label: 'To',   sortable: true },
+      { key: 'via',  label: 'Via',  sortable: true },
+      { key: 'direction', label: 'Direction', sortable: true },
+      { key: 'file', label: 'File', sortable: true },
+      { key: 'line', label: 'Line', sortable: true },
+    ]
+    html += `<h3 class="font-medium text-gray-700 mt-6 mb-2">Channel edges (${edges.length})</h3>`
+    html += renderTable('edges', edgeCols, edges, [], 'from', null)
+  }
+
+  if (channels.length) {
+    const chanCols = [
+      { key: 'name', label: 'Name', sortable: true },
+      { key: 'file', label: 'File', sortable: true },
+      { key: 'element_type', label: 'Type', sortable: true },
+      { key: 'buffered', label: 'Buffered', sortable: true },
+    ]
+    html += `<h3 class="font-medium text-gray-700 mt-6 mb-2">Channels (${channels.length})</h3>`
+    html += renderTable('channels', chanCols, channels, [], 'name', null)
+  }
+
+  return html
+}
+
+// ─── table rendering ──────────────────────────────────────────────────────────
+
+function initTableState(checkId) {
+  if (!state.tableState[checkId]) {
+    const meta = CHECKS[checkId]
+    state.tableState[checkId] = {
+      sortCol: meta?.defaultSort || (meta?.columns[0]?.key || 'file'),
+      sortDir: 'asc',
+      filter: '',
+      statusFilter: 'all',
+      expanded: new Set(),
+    }
+  }
+}
+
+function renderFilteredTable(checkId, meta, rawItems) {
+  initTableState(checkId)
+  const ts = state.tableState[checkId]
+  const items = rawItems.map(item => enrichItem(checkId, item))
+
+  // Filter
+  let filtered = items.filter(item => {
+    if (ts.filter) {
+      const hay = JSON.stringify(item).toLowerCase()
+      if (!hay.includes(ts.filter.toLowerCase())) return false
+    }
+    if (ts.statusFilter !== 'all') {
+      const statusVal = String(item[meta.statusKey] || '').toLowerCase()
+      if (!statusVal.includes(ts.statusFilter)) return false
+    }
+    return true
+  })
+
+  // Sort
+  filtered.sort((a, b) => {
+    const av = String(a[ts.sortCol] ?? '')
+    const bv = String(b[ts.sortCol] ?? '')
+    const cmp = isNaN(av) || isNaN(bv)
+      ? av.localeCompare(bv)
+      : parseFloat(av) - parseFloat(bv)
+    return ts.sortDir === 'asc' ? cmp : -cmp
+  })
+
+  const controls = `
+    <div class="flex gap-2 mb-3">
+      <input type="text" placeholder="Filter…" value="${escHtml(ts.filter)}"
+        oninput="setFilter('${checkId}', this.value)"
+        class="border border-gray-300 rounded px-2 py-1 text-xs flex-1 max-w-xs focus:outline-none focus:ring-1 focus:ring-blue-400">
+      <select onchange="setStatusFilter('${checkId}', this.value)"
+        class="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400">
+        <option value="all" ${ts.statusFilter==='all'?'selected':''}>All statuses</option>
+        <option value="red"    ${ts.statusFilter==='red'?'selected':''}>Red</option>
+        <option value="yellow" ${ts.statusFilter==='yellow'?'selected':''}>Yellow / Warning</option>
+        <option value="green"  ${ts.statusFilter==='green'?'selected':''}>Green</option>
+        <option value="bug"    ${ts.statusFilter==='bug'?'selected':''}>BUG</option>
+        <option value="warning" ${ts.statusFilter==='warning'?'selected':''}>WARNING</option>
+        <option value="info"   ${ts.statusFilter==='info'?'selected':''}>INFO</option>
+      </select>
+    </div>`
+
+  return controls + renderTable(checkId, meta.columns, filtered, meta.expandKeys, ts.sortCol, ts.sortDir, ts)
+}
+
+function renderTable(tableId, columns, items, expandKeys, sortCol, sortDir, ts) {
+  if (items.length === 0) {
+    return '<p class="text-gray-400 text-xs py-4">No items match the current filter.</p>'
+  }
+
+  const heads = columns.map(col => {
+    if (!col.sortable) return `<th class="px-3 py-2 text-left font-medium text-gray-600">${escHtml(col.label)}</th>`
+    const arrow = col.key === sortCol ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''
+    return `<th class="sortable px-3 py-2 text-left font-medium text-gray-600"
+      onclick="toggleSort('${tableId}', '${col.key}')">${escHtml(col.label)}${arrow}</th>`
+  }).join('')
+  // extra col for expand toggle
+  const expandHead = expandKeys && expandKeys.length ? '<th class="w-6"></th>' : ''
+
+  let rows = ''
+  items.forEach((item, idx) => {
+    const expanded = ts?.expanded?.has(idx) || false
+    const cells = columns.map(col => {
+      let val = item[col.key]
+      if (val === null || val === undefined) val = ''
+      if (col.badge) return `<td class="px-3 py-2">${badge(col.badge, val)}</td>`
+      if (typeof val === 'boolean') return `<td class="px-3 py-2">${val ? 'yes' : 'no'}</td>`
+      return `<td class="px-3 py-2 font-mono text-xs truncate max-w-xs" title="${escHtml(String(val))}">${escHtml(String(val))}</td>`
+    }).join('')
+
+    const expandBtn = expandKeys && expandKeys.length
+      ? `<td class="px-1 py-2 text-gray-400">${expanded ? '▼' : '▶'}</td>`
+      : ''
+    const clickAttr = expandKeys && expandKeys.length
+      ? `onclick="toggleRow('${tableId}', ${idx})"` : ''
+
+    rows += `<tr class="border-t border-gray-100 row-expand" ${clickAttr}>${expandBtn}${cells}</tr>`
+
+    if (expanded && expandKeys && expandKeys.length) {
+      rows += `<tr class="border-t border-blue-100 bg-blue-50">
+        <td colspan="${columns.length + 1}" class="px-4 py-3">
+          ${renderExpanded(item, expandKeys)}
+        </td>
+      </tr>`
+    }
+  })
+
+  return `
+    <div class="border border-gray-200 rounded-lg overflow-hidden bg-white">
+      <table class="w-full text-xs">
+        <thead class="bg-gray-50"><tr>${expandHead}${heads}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`
+}
+
+function renderExpanded(item, expandKeys) {
+  let html = '<div class="space-y-3 text-xs py-1">'
+  for (const key of expandKeys) {
+    let val = item[key]
+    if (val === null || val === undefined || val === '') continue
+    if (key === '_shared') continue
+    if (Array.isArray(val) && val.length === 0) continue
+
+    const label = key.replace(/^_/, '').replace(/_/g, ' ')
+
+    if (key === 'snippet' || key === 'source_snippet' || key === 'source_context') {
+      html += `<div>
+        <div class="font-medium text-gray-500 mb-1">${escHtml(label)}</div>
+        <pre class="bg-gray-900 text-green-300 rounded p-3 text-xs overflow-x-auto">${escHtml(String(val))}</pre>
+      </div>`
+
+    } else if (key === '_hazards') {
+      const list = val.map(h =>
+        `<div class="flex gap-2 items-start py-1 border-t border-gray-100 first:border-0">
+          <span class="flex-shrink-0">${badge('severity', h.severity)}</span>
+          <div>
+            <span class="font-mono text-gray-700">${escHtml(h.kind)}</span>
+            <span class="text-gray-500 ml-1">— ${escHtml(h.detail)}</span>
+          </div>
+        </div>`
+      ).join('')
+      html += `<div>
+        <div class="font-medium text-gray-500 mb-1">hazards</div>
+        <div class="border border-gray-200 rounded px-2">${list}</div>
+      </div>`
+
+    } else if (key === '_senders' || key === '_receivers' || key === '_closers') {
+      html += `<div>
+        <div class="font-medium text-gray-500 mb-1">${escHtml(label)}</div>
+        ${renderSiteTable(val)}
+      </div>`
+
+    } else if (key === '_locks_a' || key === '_locks_b') {
+      const funcName = key === '_locks_a' ? item.func_a : item.func_b
+      html += `<div>
+        <div class="font-medium text-gray-500 mb-1">${escHtml(label)}</div>
+        ${renderLockSteps(val, funcName)}
+      </div>`
+
+    } else if (Array.isArray(val)) {
+      html += `<div class="flex gap-3">
+        <div class="font-medium text-gray-500 w-32 flex-shrink-0">${escHtml(label)}</div>
+        <div class="text-gray-700 whitespace-normal break-words">${escHtml(val.join(', '))}</div>
+      </div>`
+
+    } else {
+      html += `<div class="flex gap-3">
+        <div class="font-medium text-gray-500 w-32 flex-shrink-0">${escHtml(label)}</div>
+        <div class="text-gray-700 whitespace-normal break-words">${escHtml(String(val))}</div>
+      </div>`
+    }
+  }
+  html += '</div>'
+  return html
+}
+
+// ─── item enrichment (compute derived fields for display) ─────────────────────
+
+function enrichItem(checkId, item) {
+  const out = { ...item }
+
+  if (checkId === 'check-channels') {
+    out._hazard_count = (item.hazards || []).length
+    // keep as raw arrays for rich rendering
+    out._senders   = item.senders   || []
+    out._receivers = item.receivers || []
+    out._closers   = item.closers   || []
+    out._hazards   = item.hazards   || []
+  }
+  if (checkId === 'check-locks') {
+    out._shared  = (item.shared_locks || []).join(', ')
+    out._locks_a = item.locks_a || []
+    out._locks_b = item.locks_b || []
+  }
+  return out
+}
+
+function formatLockSeq(locks) {
+  if (!locks || !locks.length) return ''
+  return locks.map(l => `${l.name}.${l.kind}()`).join(' → ')
+}
+
+// renderSiteTable renders an array of {file, line, context} as a compact table.
+function renderSiteTable(sites) {
+  if (!sites || !sites.length) return '<span class="text-gray-400 italic">none</span>'
+  const rows = sites.map(s =>
+    `<tr class="border-t border-gray-100">
+      <td class="pr-4 py-0.5 font-mono text-gray-700">${escHtml(s.file)}:${s.line}</td>
+      <td class="py-0.5 text-gray-500">${escHtml(s.context)}</td>
+    </tr>`
+  ).join('')
+  return `<table class="text-xs mt-0.5"><tbody>${rows}</tbody></table>`
+}
+
+// renderLockSteps renders a lock acquisition sequence as numbered steps.
+function renderLockSteps(locks, funcName) {
+  if (!locks || !locks.length) return '<span class="text-gray-400 italic">none</span>'
+  const steps = locks.map((l, i) =>
+    `<div class="flex gap-2 items-baseline">
+      <span class="text-gray-400 w-4 text-right flex-shrink-0">${i+1}.</span>
+      <span class="font-mono text-gray-700">${escHtml(l.name)}.${escHtml(l.kind)}()</span>
+      <span class="text-gray-400">line ${l.line}</span>
+    </div>`
+  ).join('')
+  return `<div class="space-y-0.5">
+    <div class="text-gray-500 mb-1">${escHtml(funcName || '')}</div>
+    ${steps}
+  </div>`
+}
+
+// ─── event handlers ───────────────────────────────────────────────────────────
+
+function selectCheck(checkId) {
+  state.selectedCheck = checkId
+  renderSidebar()
+  renderMain()
+}
+
+async function runCheck(checkId) {
+  const projectDir = state.projectDir || document.getElementById('projectDirInput').value
+  if (!projectDir) {
+    alert('Enter a project directory first.')
+    return
+  }
+  state.projectDir = projectDir
+
+  if (!state.checks[checkId]) state.checks[checkId] = {}
+  state.checks[checkId].status = 'running'
+  state.checks[checkId].runId = null
+  state.checks[checkId].result = null
+
+  renderSidebar()
+  renderMain()
+
+  try {
+    const resp = await fetch('/api/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ check: checkId, project_dir: projectDir }),
+    })
+    const data = await resp.json()
+    if (!resp.ok) throw new Error(data.error || 'run failed')
+    state.checks[checkId].runId = data.run_id
+    pollRun(checkId, data.run_id)
+  } catch (e) {
+    state.checks[checkId].status = 'error'
+    state.checks[checkId].error = String(e)
+    renderSidebar()
+    renderMain()
+  }
+}
+
+async function pollRun(checkId, runId) {
+  try {
+    const resp = await fetch(`/api/run/${runId}`)
+    const data = await resp.json()
+    if (!resp.ok) throw new Error(data.error || 'poll failed')
+
+    if (data.status === 'running') {
+      setTimeout(() => pollRun(checkId, runId), 2000)
+      return
+    }
+
+    state.checks[checkId].status = data.status
+    if (data.status === 'done') {
+      state.checks[checkId].result = data.result
+      // attach output file path for display
+      if (data.output_file && data.result) {
+        data.result.output_file = data.output_file
+      }
+    } else {
+      state.checks[checkId].error = data.error
+    }
+  } catch (e) {
+    state.checks[checkId].status = 'error'
+    state.checks[checkId].error = String(e)
+  }
+  renderSidebar()
+  renderMain()
+}
+
+function setFilter(checkId, value) {
+  initTableState(checkId)
+  state.tableState[checkId].filter = value
+  state.tableState[checkId].expanded = new Set()
+  renderMain()
+}
+
+function setStatusFilter(checkId, value) {
+  initTableState(checkId)
+  state.tableState[checkId].statusFilter = value
+  state.tableState[checkId].expanded = new Set()
+  renderMain()
+}
+
+function toggleSort(tableId, col) {
+  initTableState(tableId)
+  const ts = state.tableState[tableId]
+  if (ts.sortCol === col) {
+    ts.sortDir = ts.sortDir === 'asc' ? 'desc' : 'asc'
+  } else {
+    ts.sortCol = col
+    ts.sortDir = 'asc'
+  }
+  renderMain()
+}
+
+function toggleRow(tableId, idx) {
+  initTableState(tableId)
+  const expanded = state.tableState[tableId].expanded
+  if (expanded.has(idx)) {
+    expanded.delete(idx)
+  } else {
+    expanded.add(idx)
+  }
+  renderMain()
+}
+
+// ─── utilities ────────────────────────────────────────────────────────────────
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+// ─── init ─────────────────────────────────────────────────────────────────────
+
+async function init() {
+  // Pre-populate project dir if passed via URL params (future feature) or leave blank
+  renderSidebar()
+  renderMain()
+}
+
+init()
+</script>
+</body>
+</html>

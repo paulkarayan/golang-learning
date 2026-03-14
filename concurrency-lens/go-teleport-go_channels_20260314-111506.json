@@ -1,0 +1,58 @@
+{
+  "check": "check-channels",
+  "project_dir": "/Users/pk/go-teleport-go",
+  "run_at": "2026-03-14T11:15:06.160978-07:00",
+  "duration_ms": 51221,
+  "item_count": 1,
+  "items": [
+    {
+      "id": "chan_1",
+      "name": "drained",
+      "file": "jobworker/output_buffer.go",
+      "line": 30,
+      "element_type": "struct{...}",
+      "buffered": false,
+      "buffer_size": "",
+      "senders": null,
+      "receivers": [
+        {
+          "file": "jobworker/manager.go",
+          "line": 170,
+          "context": "JobManager.Output"
+        },
+        {
+          "file": "jobworker/output_buffer.go",
+          "line": 70,
+          "context": "OutputBufferReader.Read"
+        }
+      ],
+      "closers": [
+        {
+          "file": "jobworker/output_buffer.go",
+          "line": 72,
+          "context": "OutputBufferReader.Read"
+        }
+      ],
+      "close_owner": "OutputBufferReader.Read (output_buffer.go:72) — it is the sole producer of the 'drained' signal and must own the close",
+      "hazards": [
+        {
+          "kind": "double_close",
+          "severity": "BUG",
+          "detail": "OutputBufferReader.Read both receives from drained (line 70) and closes it (line 72). If Read is called concurrently by multiple goroutines, or if the function can be re-entered after the channel is already closed, two goroutines could both pass the receive-check at line 70 and then both attempt close(drained) at line 72, causing a panic. A sync.Once guard on the close is required."
+        },
+        {
+          "kind": "unbuffered_deadlock",
+          "severity": "WARNING",
+          "detail": "There are zero senders; the channel is used purely as a broadcast-close signal. The receiver at manager.go:170 (JobManager.Output) will block indefinitely if OutputBufferReader.Read exits via an error path before reaching the close at line 72. Any early return, panic recovery, or missed code path in Read that skips line 72 leaves Output deadlocked permanently."
+        },
+        {
+          "kind": "no_close",
+          "severity": "WARNING",
+          "detail": "The close at output_buffer.go:72 is the only way to unblock both receivers. If an OutputBufferReader is created (NewReader, line 30) but Read is never called — e.g. the reader is abandoned after creation — neither receiver is ever unblocked. The channel leaks and JobManager.Output goroutine leaks with it."
+        }
+      ],
+      "llm_summary": "The drained channel is a close-to-broadcast done signal with no senders, making the double-close risk at OutputBufferReader.Read:72 the critical BUG (needs sync.Once), while two additional WARNING-level hazards exist: a deadlock if Read exits early without closing, and a goroutine/channel leak if the reader is created but never called.",
+      "source_context": "// function: OutputBuffer.NewReader\n// jobworker/output_buffer.go:29-31\n  29 | func (ob *OutputBuffer) NewReader() *OutputBufferReader {\n  30 | \treturn \u0026OutputBufferReader{ob: ob, drained: make(chan struct{})}\n  31 | }\n"
+    }
+  ]
+}
